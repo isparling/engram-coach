@@ -1,5 +1,5 @@
 {
-  "name": "@claw-coach/tools",
+  "name": "@isparling/engram-coach-tools",
   "private": true,
   "scripts": {
     "test": "vitest run",

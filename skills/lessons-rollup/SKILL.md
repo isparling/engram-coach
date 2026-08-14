@@ -1,6 +1,6 @@
 ---
 name: lessons-rollup
-description: Append calibration points to lessons-log.md, then propose claim records and re-render ATHLETE_PROFILE.md and COACH_PROFILE.md through the peigs harness rollup gate. Auto-tails block-review, race-analysis, and season-retrospective; can also run standalone for re-curation. Requires config.json configured and a registered harness space.
+description: Append calibration points to lessons-log.md, then propose claim records and re-render ATHLETE_PROFILE.md and COACH_PROFILE.md through the engram harness rollup gate. Auto-tails block-review, race-analysis, and season-retrospective; can also run standalone for re-curation. Requires config.json configured and a registered harness space.
 ---
 
 # Lessons Rollup
@@ -116,7 +116,7 @@ The diff gate, the additive/non-additive classification, and the approval bindin
 harness's, not this skill's. Preview the batch:
 
 ```bash
-node "$PEIGS_HARNESS/src/cli.ts" rollup preview --bullets {batch}.json
+engram rollup preview --bullets {batch}.json
 ```
 
 Show the athlete the rendered diff. `approval_required: true` means the batch is
@@ -124,7 +124,7 @@ non-additive and needs an explicit yes. On approval, re-supply the same batch fi
 the previewed hash:
 
 ```bash
-node "$PEIGS_HARNESS/src/cli.ts" rollup approve --bullets {batch}.json --expect {rollup_hash}
+engram rollup approve --bullets {batch}.json --expect {rollup_hash}
 ```
 
 Approval is stateless and bound to the plan: if any record changed since the preview, the
@@ -143,9 +143,9 @@ command indexes every collection on the machine and is prohibited.
 Both profiles are generated from the same claim records; neither is edited by hand.
 
 ```bash
-node "$PEIGS_HARNESS/src/cli.ts" render --view athlete-profile --audience athlete \
+engram render --view athlete-profile --audience athlete \
   --delivery profile-markdown --model orchestrator/manual
-node "$PEIGS_HARNESS/src/cli.ts" render --view athlete-profile --audience coach \
+engram render --view athlete-profile --audience coach \
   --delivery profile-markdown --model orchestrator/manual
 ```
 
@@ -161,7 +161,7 @@ A third audience exists when the space configures `clinicalThemes`. It is render
 demand rather than kept as a standing file, because a doctor-prep summary is episodic:
 
 ```bash
-node "$PEIGS_HARNESS/src/cli.ts" render --view athlete-profile --audience clinician \
+engram render --view athlete-profile --audience clinician \
   --delivery profile-markdown --model orchestrator/manual
 ```
 

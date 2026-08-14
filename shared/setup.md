@@ -1,6 +1,6 @@
 # Shared setup preamble
 
-Canonical configuration resolution for every claw-coach skill. **This is the only
+Canonical configuration resolution for every engram-coach skill. **This is the only
 copy — do not inline it into a skill.** A skill invokes it by naming which
 optional steps apply.
 
@@ -14,15 +14,15 @@ Run silently. No user input except where step 6 applies.
   assets resolve from here: `personas/`, `templates/`, `knowledge/`, `analyses/`,
   `tools/`, and `shared/`.
 - **Config path** — the first of these that exists, hereafter `{config_path}`:
-  `$CLAW_COACH_CONFIG` → `./.claw-coach/config.json` (project-level, in the
-  athlete repo you are working in) → `~/.claude/claw-coach/config.json`.
+  `$ENGRAM_COACH_CONFIG` → `./.engram-coach/config.json` (project-level, in the
+  athlete repo you are working in) → `~/.claude/engram-coach/config.json`.
 
 ## 2. Read config _(all skills)_
 
 Read `{config_path}`. If absent, stop and output:
 
-> "config.json not found. Run `claw-coach:intake` to create it, or copy
-> `${CLAUDE_PLUGIN_ROOT}/config.json.example` to `./.claw-coach/config.json`
+> "config.json not found. Run `engram-coach:intake` to create it, or copy
+> `${CLAUDE_PLUGIN_ROOT}/config.json.example` to `./.engram-coach/config.json`
 > and configure your paths. See SETUP.md."
 
 ## 3. Resolve active profile _(all skills)_

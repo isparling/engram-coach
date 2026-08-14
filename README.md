@@ -1,8 +1,8 @@
-# claw-coach
+# engram-coach
 
 ## What it does
 
-claw-coach is a document-driven endurance-coaching plugin for Claude Code. It combines athlete-approved coaching records with Intervals.icu activity and wellness data to adapt training, review blocks and seasons, analyze races, and preserve durable lessons in Markdown.
+engram-coach is a document-driven endurance-coaching plugin for Claude Code. It combines athlete-approved coaching records with Intervals.icu activity and wellness data to adapt training, review blocks and seasons, analyze races, and preserve durable lessons in Markdown.
 
 The plugin provides coaching workflows and deterministic analysis tools. Athlete records, credentials, and local configuration remain outside this repository.
 
@@ -33,6 +33,30 @@ You can define a custom policy with [`PERSONA_SCHEMA.md`](PERSONA_SCHEMA.md).
 ## Installation
 
 Follow [`SETUP.md`](SETUP.md) to install the plugin, configure Intervals.icu access, and create a local coaching workspace.
+
+For direct OMP integration, install the published Engram packages and bind the OMP extension:
+
+```sh
+npm install @isparling/engram-coach @isparling/engram-harness @isparling/engram-cli @isparling/engram-omp
+```
+
+```yaml
+extensions:
+  - ./node_modules/@isparling/engram-omp/omp-extension.ts
+```
+
+```json
+{
+  "installed_packs": [
+    {
+      "id": "engram-coach",
+      "version": "0.1.0",
+      "from": "@isparling/engram-coach",
+      "extract": true
+    }
+  ]
+}
+```
 
 ## Configuration
 

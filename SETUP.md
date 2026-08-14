@@ -12,8 +12,8 @@ Confirm each item before continuing. Steps 2-5 below cover each in detail.
 - [ ] Intervals.icu account with API key
 - [ ] Athlete ID from Intervals.icu
 - [ ] QMD installed and initialized
-- [ ] claw-coach installed as a Claude Code plugin (see Step 6)
-- [ ] `.claw-coach/config.json` created in your athlete repo (see Step 5)
+- [ ] engram-coach installed as a Claude Code plugin (see Step 6)
+- [ ] `.engram-coach/config.json` created in your athlete repo (see Step 5)
 
 ---
 
@@ -35,7 +35,7 @@ Skills call Intervals.icu via MCP tools. You need two values from your Intervals
 **These values are used in two places.** The MCP server needs them as environment
 variables (step 3) for the tools skills call during reasoning. The TypeScript
 analysis tools read them from the `intervals_icu` block of your
-`.claw-coach/config.json` (step 5) when invoked over the CLI. Set both.
+`.engram-coach/config.json` (step 5) when invoked over the CLI. Set both.
 
 ---
 
@@ -80,7 +80,7 @@ Or consult the [QMD installation documentation](https://github.com/tobi/qmd) for
 **Initialize a collection scoped to this repo**
 
 ```
-cd ./claw-coach
+cd ./engram-coach
 qmd init
 ```
 
@@ -92,7 +92,7 @@ This creates a QMD collection in the current directory.
 qmd ls
 ```
 
-Should show the claw-coach collection without error.
+Should show the engram-coach collection without error.
 
 **Run first index**
 
@@ -118,7 +118,7 @@ When you add new coaching records to your `coaching_docs_dir`, run `qmd update` 
 
 ## 5. Athlete Configuration
 
-claw-coach is installed as a Claude Code **plugin** (§6). The plugin ships the
+engram-coach is installed as a Claude Code **plugin** (§6). The plugin ships the
 engine — skills, personas, templates, tools. Your athlete-specific configuration
 lives **outside** the plugin, in the repo where your coaching records live.
 
@@ -131,26 +131,36 @@ lives **outside** the plugin, in the repo where your coaching records live.
 
 | Order | Path | Use |
 |---|---|---|
-| 1 | `$CLAW_COACH_CONFIG` | Explicit override |
-| 2 | `./.claw-coach/config.json` | **Default** — project-level, in your athlete repo |
-| 3 | `~/.claude/claw-coach/config.json` | User-level fallback |
+| 1 | `$ENGRAM_COACH_CONFIG` | Explicit override |
+| 2 | `./.engram-coach/config.json` | **Default** — project-level, in your athlete repo |
+| 3 | `~/.claude/engram-coach/config.json` | User-level fallback |
 
 **Create it** (from your athlete repo — the one holding `docs/coaching/`):
 
 ```bash
-mkdir -p .claw-coach
-cp "$(ls -d ~/.claude/plugins/cache/*/claw-coach/*/ | tail -1)config.json.example" .claw-coach/config.json
-printf '\n# claw-coach machine-local config (holds Intervals.icu API key)\n.claw-coach/\n' >> .gitignore
+mkdir -p .engram-coach
+cp "$(ls -d ~/.claude/plugins/cache/*/engram-coach/*/ | tail -1)config.json.example" .engram-coach/config.json
+printf '\n# engram-coach machine-local config (holds Intervals.icu API key)\n.engram-coach/\n' >> .gitignore
 ```
 
-**`.claw-coach/` MUST be gitignored** — it holds your Intervals.icu API key.
-Verify with `git check-ignore -v .claw-coach/config.json` before committing anything.
+**`.engram-coach/` MUST be gitignored** — it holds your Intervals.icu API key.
+Verify with `git check-ignore -v .engram-coach/config.json` before committing anything.
 
-Or skip all of the above and run `claw-coach:intake`, which writes the file for you.
+Or skip all of the above and run `engram-coach:intake`, which writes the file for you.
+
+**Migrating from an existing pre-rename local config directory?** Rename it in
+place — the config contents and schema are unchanged, only the directory name moved:
+
+```sh
+mv .claw-coach .engram-coach
+```
+
+There is no runtime fallback to the old directory name or the old explicit
+configuration-override environment variable — rename before invoking any skill.
 
 **Edit the config**
 
-Open `.claw-coach/config.json` and replace the placeholder values:
+Open `.engram-coach/config.json` and replace the placeholder values:
 
 ```json
 {
@@ -179,7 +189,7 @@ Open `.claw-coach/config.json` and replace the placeholder values:
 Run this check from your athlete repo to confirm no placeholder paths remain:
 
 ```
-python3 -c "import json; d=json.load(open('.claw-coach/config.json')); assert '~/REPLACE' not in str(d), 'Placeholder paths still present — edit .claw-coach/config.json'; print('config OK')"
+python3 -c "import json; d=json.load(open('.engram-coach/config.json')); assert '~/REPLACE' not in str(d), 'Placeholder paths still present — edit .engram-coach/config.json'; print('config OK')"
 ```
 
 Should print `config OK`.
@@ -188,22 +198,22 @@ Should print `config OK`.
 
 ## 6. Install the Plugin
 
-claw-coach is a Claude Code plugin. Skills are discovered from their own
+engram-coach is a Claude Code plugin. Skills are discovered from their own
 frontmatter in `skills/*/SKILL.md` — there is no wrapper layer to maintain, and
 new skills register themselves.
 
 **Add the marketplace and install**
 
 ```
-/plugin marketplace add isparling/claw-coach
-/plugin install claw-coach@claw-coach
+/plugin marketplace add isparling/engram-coach
+/plugin install engram-coach@engram-coach
 ```
 
 For local development against a working checkout, point the marketplace at the
 directory instead:
 
 ```
-/plugin marketplace add ~/code/claw-coach
+/plugin marketplace add ~/code/engram-coach
 ```
 
 **Install tool dependencies.** The TypeScript analysis tools (`stream-analyze`,
@@ -216,7 +226,7 @@ committed. Whether you need this step depends on how you installed:
 | Local path marketplace | **Usually no.** A local install copies the working directory as-is, including `tools/node_modules`. Run it only if the directory is missing or the lockfile changed. |
 
 ```bash
-cd "$(ls -d ~/.claude/plugins/cache/*/claw-coach/*/ | tail -1)tools" && npm install
+cd "$(ls -d ~/.claude/plugins/cache/*/engram-coach/*/ | tail -1)tools" && npm install
 ```
 
 Skills degrade gracefully if this is skipped — each affected analysis annotates
@@ -237,23 +247,54 @@ lose decoupling, HR-recovery, interval-CV, and HRV-trend analysis until it runs.
 > diff the cache against your checkout:
 >
 > ```bash
-> diff -rq "$(ls -d ~/.claude/plugins/cache/*/claw-coach/*/ | tail -1)skills" ./skills
+> diff -rq "$(ls -d ~/.claude/plugins/cache/*/engram-coach/*/ | tail -1)skills" ./skills
 > ```
 
 **Verify**
 
-Restart Claude Code. Type `/claw-coach` — all ten skills should appear:
+Restart Claude Code. Type `/engram-coach` — all ten skills should appear:
 `adapt-plan`, `block-review`, `consult`, `intake`, `lactate-analyze`,
 `lessons-rollup`, `monitoring-rollup`, `race-analysis`,
 `season-retrospective`, `set-goal`.
 
 > **Migrating from the old symlink install?** Earlier versions registered
-> commands via `ln -s /path/to/claw-coach/commands ~/.claude/commands/claw-coach`
+> commands via `ln -s /path/to/engram-coach/commands ~/.claude/commands/engram-coach`
 > and a `make install-skills` symlink into `~/.claude/skills/`. Both are
 > superseded. Once the plugin is verified, remove them:
-> `rm ~/.claude/commands/claw-coach` and delete any `~/.claude/skills/*` symlinks
+> `rm ~/.claude/commands/engram-coach` and delete any `~/.claude/skills/*` symlinks
 > pointing into a coaching repo. Leaving them in place risks a stale duplicate
 > shadowing the plugin.
+
+### Alternative: Direct OMP integration
+
+Instead of (or in addition to) the Claude Code plugin, `engram-coach` can be
+loaded directly into OMP as an Engram external pack, without the plugin layer:
+
+```sh
+npm install @isparling/engram-coach @isparling/engram-harness @isparling/engram-cli @isparling/engram-omp
+```
+
+Bind the OMP extension:
+
+```yaml
+extensions:
+  - ./node_modules/@isparling/engram-omp/omp-extension.ts
+```
+
+Register the pack in OMP's installed-packs configuration:
+
+```json
+{
+  "installed_packs": [
+    {
+      "id": "engram-coach",
+      "version": "0.1.0",
+      "from": "@isparling/engram-coach",
+      "extract": true
+    }
+  ]
+}
+```
 
 ---
 
@@ -263,7 +304,7 @@ Run these checks to confirm the complete setup is working before invoking a skil
 
 - [ ] **Slash commands registered**
   ```
-  ls ~/.claude/commands/claw-coach/
+  ls ~/.claude/commands/engram-coach/
   ```
   Should list `intake.md`, `adapt-plan.md`, `consult.md`, and `block-review.md`.
 
@@ -271,17 +312,17 @@ Run these checks to confirm the complete setup is working before invoking a skil
   ```
   qmd ls
   ```
-  Should show the claw-coach collection.
+  Should show the engram-coach collection.
 
 - [ ] **Active persona readable**
   ```
-  cat .claw-coach/config.json | python3 -c "import json,sys; d=json.load(sys.stdin); print('active_persona:', d['profiles']['default']['active_persona'])"
+  cat .engram-coach/config.json | python3 -c "import json,sys; d=json.load(sys.stdin); print('active_persona:', d['profiles']['default']['active_persona'])"
   ```
   Should print your active persona slug.
 
 - [ ] **Persona file resolves**
   ```
-  ls personas/$(python3 -c "import json; print(json.load(open('.claw-coach/config.json'))['profiles']['default']['active_persona'])").json
+  ls personas/$(python3 -c "import json; print(json.load(open('.engram-coach/config.json'))['profiles']['default']['active_persona'])").json
   ```
   Should print the persona filename without error (e.g., `personas/volume.json`).
 
@@ -289,7 +330,7 @@ Run these checks to confirm the complete setup is working before invoking a skil
 
 - [ ] **coaching_docs_dir exists**
   ```
-  ls $(python3 -c "import json,os; print(os.path.expanduser(json.load(open('.claw-coach/config.json'))['profiles']['default']['coaching_docs_dir']))")
+  ls $(python3 -c "import json,os; print(os.path.expanduser(json.load(open('.engram-coach/config.json'))['profiles']['default']['coaching_docs_dir']))")
   ```
   Should list directory contents without error. If the directory does not exist, create it:
   ```
@@ -320,26 +361,26 @@ Once you've run a few skills, your `coaching_docs_dir` will accumulate these doc
 
 ## 9. Troubleshooting
 
-**`/claw-coach:intake` not appearing in Claude Code autocomplete**
+**`/engram-coach:intake` not appearing in Claude Code autocomplete**
 Confirm the files exist:
 ```
-ls ~/.claude/commands/claw-coach/
+ls ~/.claude/commands/engram-coach/
 ```
 If the skills are missing, re-run the install in Step 6 and restart Claude Code —
-plugins are loaded at session start. Check `/plugin` to confirm claw-coach is
+plugins are loaded at session start. Check `/plugin` to confirm engram-coach is
 listed and enabled.
 
 **"config.json not found"**
-You have not created the athlete config. Either run `claw-coach:intake`, or from
+You have not created the athlete config. Either run `engram-coach:intake`, or from
 your athlete repo:
 ```
-mkdir -p .claw-coach
-cp "$(ls -d ~/.claude/plugins/cache/*/claw-coach/*/ | tail -1)config.json.example" .claw-coach/config.json
+mkdir -p .engram-coach
+cp "$(ls -d ~/.claude/plugins/cache/*/engram-coach/*/ | tail -1)config.json.example" .engram-coach/config.json
 ```
-Remember to gitignore `.claw-coach/` — it holds your API key.
+Remember to gitignore `.engram-coach/` — it holds your API key.
 
 **"persona file not found" / `ls: personas/undefined.json: No such file or directory`**
-Your `active_persona` value in `.claw-coach/config.json` does not match any file in `personas/`. Valid slugs are: `conservative`, `aggressive`, `polarized`, `volume`. Check for typos.
+Your `active_persona` value in `.engram-coach/config.json` does not match any file in `personas/`. Valid slugs are: `conservative`, `aggressive`, `polarized`, `volume`. Check for typos.
 
 **"coaching_docs_dir does not exist" or similar path error**
 Create the directory:
@@ -349,7 +390,7 @@ mkdir -p <your-coaching-docs-path>
 Then re-run the verification check.
 
 **"Placeholder paths still present"**
-Open `.claw-coach/config.json` and replace all `~/REPLACE_WITH_...` values with real paths.
+Open `.engram-coach/config.json` and replace all `~/REPLACE_WITH_...` values with real paths.
 
 **MCP tools not appearing in NanoClaw**
 Verify the Intervals.icu MCP server is correctly configured in NanoClaw. Consult the NanoClaw documentation for MCP server setup and confirm the server is listed as active. Check that `INTERVALS_API_KEY` and `INTERVALS_ATHLETE_ID` are set correctly in the MCP server environment.

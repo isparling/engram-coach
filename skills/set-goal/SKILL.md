@@ -204,7 +204,7 @@ Body starts as a single heading:
 ```markdown
 # {Arc} — {Sub-block} Consultations
 
-_(empty — append entries via claw-coach:consult or claw-coach:adapt-plan)_
+_(empty — append entries via engram-coach:consult or engram-coach:adapt-plan)_
 ```
 
 **6. Optional: kickoff consultation entry**
@@ -229,9 +229,9 @@ Prescriptions:    {prescriptions_dir}/{arc_name}_*.yaml
 
 Next steps:
   1. {first sub-block name} starts {date}
-  2. Invoke claw-coach:adapt-plan after first key session
-  3. Invoke claw-coach:consult mid-{first sub-block} for check-in (or sooner if signals diverge)
-  4. Invoke claw-coach:block-review at each sub-block boundary
+  2. Invoke engram-coach:adapt-plan after first key session
+  3. Invoke engram-coach:consult mid-{first sub-block} for check-in (or sooner if signals diverge)
+  4. Invoke engram-coach:block-review at each sub-block boundary
 ```
 
 ---

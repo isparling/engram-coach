@@ -9,7 +9,7 @@ const program = new Command();
 
 program
   .name('lactate')
-  .description('Lightweight lactate analysis tool for Claw-Coach')
+  .description('Lightweight lactate analysis tool for Engram Coach')
   .version('1.0.0');
 
 program.addCommand(createImportCommand());

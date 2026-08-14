@@ -7,7 +7,7 @@ description: Query lactate analysis results for an athlete. Use this when you ne
 
 ## Overview
 
-This skill provides access to the lactate analysis subsystem for querying threshold values, FTP/FTHR estimates, and spot test analysis. The Claw-Coach uses this during Orient phase to inform training decisions.
+This skill provides access to the lactate analysis subsystem for querying threshold values, FTP/FTHR estimates, and spot test analysis. Engram Coach uses this during Orient phase to inform training decisions.
 
 ## Data Flow
 
@@ -30,7 +30,7 @@ Prescription YAML (spot test orders)
    lactate query (CLI or API)
          │
          ▼
-   Claw-Coach adapts training
+   Engram Coach adapts training
 ```
 
 ## Usage
@@ -60,7 +60,7 @@ lactate query --latest
 lactate query --latest --compare  # Compare to previous test
 ```
 
-### Query via API (for Claw-Coach integration)
+### Query via API (for Engram Coach integration)
 
 ```typescript
 import { createLactateAPI } from './lactate';

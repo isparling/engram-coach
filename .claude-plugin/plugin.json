@@ -1,12 +1,12 @@
 {
-  "name": "claw-coach",
+  "name": "engram-coach",
   "description": "Doc-driven AI endurance coaching. Persona-based reasoning over Intervals.icu data that adapts prescriptions, runs consultations, analyzes races, and compounds durable athlete knowledge into markdown coaching records.",
   "version": "1.0.0",
   "author": {
     "name": "Isaac Sparling"
   },
-  "homepage": "https://github.com/isparling/claw-coach",
-  "repository": "https://github.com/isparling/claw-coach",
+  "homepage": "https://github.com/isparling/engram-coach",
+  "repository": "https://github.com/isparling/engram-coach",
   "keywords": [
     "coaching",
     "endurance",

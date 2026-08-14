@@ -1,7 +1,7 @@
 {
-  "name": "@claw-coach/lactate",
+  "name": "@isparling/engram-coach-lactate",
   "version": "1.0.0",
-  "description": "Lightweight lactate analysis tool for Claw-Coach",
+  "description": "Lightweight lactate analysis tool for Engram Coach",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
