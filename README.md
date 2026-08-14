@@ -58,6 +58,19 @@ extensions:
 }
 ```
 
+### Verifying the direct OMP integration
+
+After binding the pack and starting an OMP session, call the `engram_status`
+tool. It reports the binding-selected pack identity and CLI mode:
+
+```json
+{ "mode": "cli", "pack_id": "engram-coach", "pack_version": "0.1.0" }
+```
+
+`mode` is always `"cli"`. If `pack_id` is `null`, the active space's binding
+has not resolved `engram-coach`; recheck `ENGRAM_BINDING_REGISTRY` and the
+`installed_packs` declaration above.
+
 ## Configuration
 
 Copy [`config.json.example`](config.json.example) to your local configuration path and replace every placeholder. Keep credentials and athlete records outside this repository. The example config defaults to the generic `conservative` persona.
