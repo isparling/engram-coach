@@ -1,0 +1,10 @@
+{
+  "name": "@isparling/claw-coach",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Federated claw-coach OMP extension — owns its interaction with peigs via the extension pack interface.",
+  "dependencies": {
+    "@isparling/peigs-harness": "file:../peigs/harness"
+  }
+}

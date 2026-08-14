@@ -1,0 +1,16 @@
+{
+  "_comment": "Copy this file to config.json and edit values. config.json is gitignored. season is optional: if absent, adapt-plan will ask for it at runtime.",
+  "active_profile": "default",
+  "profiles": {
+    "default": {
+      "active_persona": "conservative",
+      "coaching_docs_dir": "~/REPLACE_WITH_YOUR_COACHING_DOCS_PATH",
+      "prescriptions_dir": "~/REPLACE_WITH_YOUR_PRESCRIPTIONS_PATH",
+      "season": "REPLACE_WITH_SEASON_LABEL"
+    }
+  },
+  "intervals_icu": {
+    "api_key": "REPLACE_WITH_YOUR_API_KEY",
+    "athlete_id": "REPLACE_WITH_YOUR_ATHLETE_ID"
+  }
+}

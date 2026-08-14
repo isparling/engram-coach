@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claw-coach",
+  "description": "Doc-driven AI endurance coaching skills",
+  "owner": {
+    "name": "Isaac Sparling"
+  },
+  "plugins": [
+    {
+      "name": "claw-coach",
+      "description": "Doc-driven AI endurance coaching. Persona-based reasoning over Intervals.icu data that adapts prescriptions, runs consultations, analyzes races, and compounds durable athlete knowledge into markdown coaching records.",
+      "category": "productivity",
+      "source": "./",
+      "homepage": "https://github.com/isparling/claw-coach"
+    }
+  ]
+}

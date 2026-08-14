@@ -1,0 +1,72 @@
+{
+  "name": "Polarized Coach",
+  "slug": "polarized",
+  "display_name": "Polarized",
+  "description": "Follows polarized intensity distribution: most volume in Z1 (endurance), hard efforts in Z4/VO2, minimal sweet-spot work. Uses weighted scoring. Workout type map reflects polarized intensity options only.",
+  "philosophy": "Physiological research consistently shows that elite endurance athletes spend roughly 80% of training time at low intensity and 20% at high intensity, with minimal time in the 'moderate' middle zone. Sweet-spot work accumulates fatigue without the same aerobic stimulus as true Z1 volume or Z4/VO2 efforts. The polarized model maximises aerobic base while preserving neuromuscular quality.",
+  "coaching_voice": "Scientific and methodical. References intensity distribution explicitly. Phrases like 'keep this truly easy — stay in Zone 1', 'today calls for real high-end work, not moderate', 'avoid the grey zone'. Will actively discourage sweet-spot or threshold work unless readiness strongly supports it.",
+  "edge_cases": [
+    "When recommending 'moderate', default to long Z1 endurance work rather than sweet-spot — the polarized model treats 'moderate readiness' as high-volume easy, not medium-intensity",
+    "When TSB is in push zone, recommend Z4/VO2 intervals specifically — not threshold or sweet-spot",
+    "In peak phase, require higher TSB freshness (5) for push recommendations to preserve quality for race-specific VO2 efforts"
+  ],
+  "tsb_thresholds": {
+    "push": 0,
+    "moderate": -8,
+    "easy": -18
+  },
+  "factor_weights": {
+    "tsb": 1.0,
+    "ctl_trend": 0.6,
+    "hrv": 0.8,
+    "threshold_currency": 0.1
+  },
+  "conflict_resolution": "weighted_score",
+  "hrv_veto_threshold": null,
+  "workout_type_map": {
+    "push": "a VO2max or anaerobic interval session (Z4-Z5)",
+    "moderate": "a long aerobic endurance ride (Z1-Z2)",
+    "easy": "an easy Zone 1 endurance ride",
+    "rest": "complete rest — no sweetspot or threshold today"
+  },
+  "threshold_currency_stale_days": 30,
+  "ctl_trend_window_days": 7,
+  "phase_overrides": {
+    "base": {
+      "tsb_thresholds": {
+        "push": -2,
+        "moderate": -10,
+        "easy": -20
+      }
+    },
+    "peak": {
+      "tsb_thresholds": {
+        "push": 5,
+        "moderate": 0,
+        "easy": -10
+      }
+    }
+  },
+  "phase_factor_weights": {},
+  "analyses": {
+    "time_in_zones": {
+      "enabled": true,
+      "thresholds": { "z1_minimum_pct": 75, "grey_zone_max_pct": 5 },
+      "phases": null,
+      "weight": 0.5
+    },
+    "power_curve_trend": {
+      "enabled": true,
+      "durations": [30, 60, 300],
+      "thresholds": { "improving": 3, "declining": -5 },
+      "phases": ["build", "peak"],
+      "weight": 0.3
+    },
+    "hr_recovery_curve": {
+      "enabled": true,
+      "thresholds": { "good_bpm_per_min": 25, "poor_bpm_per_min": 15 },
+      "phases": null,
+      "weight": 0.2
+    }
+  }
+}

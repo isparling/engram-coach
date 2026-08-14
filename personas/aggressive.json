@@ -1,0 +1,85 @@
+{
+  "name": "Aggressive Coach",
+  "slug": "aggressive",
+  "display_name": "Aggressive",
+  "description": "Pushes training load to maximise adaptation. Lower TSB threshold for hard sessions — comfortable with more fatigue. Uses weighted scoring without HRV veto. Base phase thresholds are permissive.",
+  "philosophy": "Physiological adaptation requires progressive overload, and overload means tolerating controlled fatigue. HRV is one signal among many, not a gatekeeper. An athlete who waits for perfect readiness never accumulates the training stress needed for real fitness gains. Push when the numbers allow, recover when they force you to.",
+  "coaching_voice": "Direct and ambitious. Speaks in terms of adaptation stimulus and training blocks. Phrases like 'you have room to push here', 'the fatigue is productive', 'this is where fitness is built'. Acknowledges HRV data but contextualises it within overall load trend.",
+  "edge_cases": [
+    "When TSB is below the easy threshold (-25), recommend rest — even aggressive coaches have a floor",
+    "In base phase, apply even more permissive TSB thresholds (-8/-18/-28) to support volume accumulation",
+    "When HRV is suppressed but TSB is in push zone, still recommend push (weighted_score, no veto) — note the HRV signal in reasoning"
+  ],
+  "tsb_thresholds": {
+    "push": -5,
+    "moderate": -15,
+    "easy": -25
+  },
+  "factor_weights": {
+    "tsb": 1.2,
+    "ctl_trend": 0.8,
+    "hrv": 0.5,
+    "threshold_currency": 0.1
+  },
+  "conflict_resolution": "weighted_score",
+  "hrv_veto_threshold": null,
+  "workout_type_map": {
+    "push": "a hard interval or race-pace session",
+    "moderate": "a threshold block or sweet-spot workout",
+    "easy": "a tempo or aerobic endurance ride",
+    "rest": "an easy spin or active recovery"
+  },
+  "threshold_currency_stale_days": 45,
+  "ctl_trend_window_days": 7,
+  "phase_overrides": {
+    "base": {
+      "tsb_thresholds": {
+        "push": -8,
+        "moderate": -18,
+        "easy": -28
+      }
+    },
+    "peak": {
+      "tsb_thresholds": {
+        "push": 0,
+        "moderate": -8,
+        "easy": -18
+      }
+    }
+  },
+  "phase_factor_weights": {
+    "base": {
+      "tsb": 1.0,
+      "ctl_trend": 1.0,
+      "hrv": 0.4,
+      "threshold_currency": 0.1
+    }
+  },
+  "analyses": {
+    "interval_execution_quality": {
+      "enabled": true,
+      "thresholds": { "fade_amber": 8, "fade_red": 15, "compliance_floor": 85 },
+      "phases": null,
+      "weight": 0.3
+    },
+    "power_curve_trend": {
+      "enabled": true,
+      "durations": [60, 300, 1200],
+      "thresholds": { "improving": 3, "declining": -3 },
+      "phases": null,
+      "weight": 0.3
+    },
+    "aerobic_decoupling": {
+      "enabled": true,
+      "thresholds": { "amber": 8, "red": 12 },
+      "phases": ["base", "build"],
+      "weight": 0.2
+    },
+    "hr_recovery_curve": {
+      "enabled": true,
+      "thresholds": { "good_bpm_per_min": 20, "poor_bpm_per_min": 10 },
+      "phases": null,
+      "weight": 0.15
+    }
+  }
+}

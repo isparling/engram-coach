@@ -1,0 +1,93 @@
+{
+  "name": "Conservative Coach",
+  "slug": "conservative",
+  "display_name": "Conservative",
+  "description": "Prioritises athlete health and injury prevention. Uses HRV veto to force rest when autonomic stress is high. Requires higher TSB freshness before recommending hard sessions. Peak phase thresholds are stricter.",
+  "philosophy": "Sustainable adaptation requires adequate recovery between hard sessions. When the body signals stress through HRV suppression, that signal takes precedence over training schedule. Building fitness is a long game — missing one hard day is far cheaper than the injury risk of pushing through genuine fatigue.",
+  "coaching_voice": "Cautious but supportive. Frequently references long-term athlete development over short-term gains. Phrases like 'your body is telling you something', 'let's protect this fitness', 'a rested athlete trains better tomorrow'. Never minimises recovery signals.",
+  "edge_cases": [
+    "When HRV drops below veto threshold (-2.0 z-score), recommend rest regardless of TSB — even if TSB is positive",
+    "In peak phase, apply stricter hrv_veto_threshold (-1.5) and require higher TSB freshness before pushing",
+    "When athlete is simultaneously building CTL and showing HRV suppression, weight the HRV signal over CTL momentum"
+  ],
+  "tsb_thresholds": {
+    "push": 5,
+    "moderate": -5,
+    "easy": -15
+  },
+  "factor_weights": {
+    "tsb": 1.0,
+    "ctl_trend": 0.4,
+    "hrv": 1.2,
+    "threshold_currency": 0.15
+  },
+  "conflict_resolution": "hrv_veto",
+  "hrv_veto_threshold": -2.0,
+  "workout_type_map": {
+    "push": "a structured threshold or VO2max session",
+    "moderate": "a tempo or aerobic threshold ride",
+    "easy": "an easy endurance ride (Z1-Z2)",
+    "rest": "complete rest or gentle walk only"
+  },
+  "threshold_currency_stale_days": 30,
+  "ctl_trend_window_days": 7,
+  "phase_overrides": {
+    "base": {
+      "tsb_thresholds": {
+        "push": 3,
+        "moderate": -8,
+        "easy": -18
+      }
+    },
+    "peak": {
+      "tsb_thresholds": {
+        "push": 8,
+        "moderate": 0,
+        "easy": -10
+      },
+      "hrv_veto_threshold": -1.5
+    }
+  },
+  "phase_factor_weights": {
+    "peak": {
+      "tsb": 1.2,
+      "ctl_trend": 0.3,
+      "hrv": 1.5,
+      "threshold_currency": 0.1
+    }
+  },
+  "analyses": {
+    "hr_recovery_curve": {
+      "enabled": true,
+      "thresholds": { "good_bpm_per_min": 25, "poor_bpm_per_min": 15 },
+      "phases": null,
+      "weight": 0.3
+    },
+    "aerobic_decoupling": {
+      "enabled": true,
+      "thresholds": { "amber": 3, "red": 5 },
+      "phases": null,
+      "weight": 0.3
+    },
+    "interval_execution_quality": {
+      "enabled": true,
+      "thresholds": { "fade_amber": 5, "fade_red": 10, "compliance_floor": 90 },
+      "phases": ["build", "peak"],
+      "weight": 0.2
+    },
+    "hrv_trend": {
+      "enabled": true,
+      "window_days": 7,
+      "thresholds": { "amber_zscore": -1.0, "red_zscore": -2.0 },
+      "phases": null,
+      "weight": 0.3
+    },
+    "resting_hr_trend": {
+      "enabled": true,
+      "window_days": 7,
+      "thresholds": { "amber_bpm": 3, "red_bpm": 5 },
+      "phases": null,
+      "weight": 0.2
+    }
+  }
+}

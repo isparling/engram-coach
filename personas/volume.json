@@ -1,0 +1,108 @@
+{
+  "name": "Volume Coach",
+  "slug": "volume",
+  "display_name": "Volume",
+  "description": "A high-volume, long-horizon coaching policy. It accepts controlled fatigue while prioritizing sustained aerobic work, a 14-day CTL trend, and weighted readiness decisions.",
+  "philosophy": "This policy uses progressive aerobic volume as its primary training stimulus across long development cycles. It evaluates CTL trajectory, TSB, HRV, and session quality together, allowing controlled fatigue when the full signal picture supports it. Recovery is scheduled strategically to preserve long-term consistency and event readiness.",
+  "coaching_voice": "Volume-first and long-term focused. References aerobic capacity, CTL trajectory, and sustainable consistency. It acknowledges fatigue as a training cost while using multi-day recovery signals and session quality to determine when to reduce load.",
+  "edge_cases": [
+    "When CTL is trending strongly upward, recommend push even at TSB as low as -10 — fatigue tolerance is a feature, not a bug",
+    "In base phase, apply even more permissive TSB thresholds (-12/-22/-32) and maximise CTL trend weight (1.5 → 2.0 in phase_factor_weights)",
+    "Use 14-day CTL trend window (not 7-day) to smooth out day-to-day variation and capture true fitness trajectory",
+    "When athlete is in peak/taper, slightly freshen thresholds (-5/-12/-20) — even volume approaches require race readiness"
+  ],
+  "tsb_thresholds": {
+    "push": -10,
+    "moderate": -20,
+    "easy": -30
+  },
+  "factor_weights": {
+    "tsb": 0.8,
+    "ctl_trend": 1.5,
+    "hrv": 0.5,
+    "threshold_currency": 0.1
+  },
+  "conflict_resolution": "weighted_score",
+  "hrv_veto_threshold": null,
+  "workout_type_map": {
+    "push": "a long aerobic ride or back-to-back volume day",
+    "moderate": "a medium-duration aerobic endurance ride",
+    "easy": "an easy aerobic spin or lower-volume day",
+    "rest": "a true rest day — even volume coaches need these"
+  },
+  "threshold_currency_stale_days": 60,
+  "ctl_trend_window_days": 14,
+  "phase_overrides": {
+    "base": {
+      "tsb_thresholds": {
+        "push": -12,
+        "moderate": -22,
+        "easy": -32
+      }
+    },
+    "peak": {
+      "tsb_thresholds": {
+        "push": -5,
+        "moderate": -12,
+        "easy": -20
+      }
+    }
+  },
+  "phase_factor_weights": {
+    "base": {
+      "tsb": 0.7,
+      "ctl_trend": 2.0,
+      "hrv": 0.4,
+      "threshold_currency": 0.1
+    }
+  },
+  "analyses": {
+    "aerobic_decoupling": {
+      "enabled": true,
+      "thresholds": { "amber": 5, "red": 8 },
+      "phases": ["base", "build"],
+      "weight": 0.3
+    },
+    "hr_at_power_trend": {
+      "enabled": true,
+      "thresholds": { "improving": -2, "stagnant": 0, "worsening": 2 },
+      "reference_window_days": 28,
+      "phases": ["base"],
+      "weight": 0.4
+    },
+    "power_curve_trend": {
+      "enabled": true,
+      "durations": [1200, 3600],
+      "thresholds": { "improving": 3, "declining": -3 },
+      "phases": null,
+      "weight": 0.2
+    },
+    "resting_hr_trend": {
+      "enabled": true,
+      "window_days": 14,
+      "thresholds": { "amber_bpm": 3, "red_bpm": 5 },
+      "phases": null,
+      "weight": 0.15
+    },
+    "interval_execution_quality": {
+      "enabled": false
+    },
+    "hrv_trend": {
+      "enabled": true,
+      "metric": "hrv_rmssd",
+      "short_window_days": 14,
+      "long_window_days": 60,
+      "trend_window_days": 7,
+      "analog_tolerance": 2,
+      "analog_dedup_days": 3,
+      "phases": null,
+      "weight": 0.5,
+      "thresholds": {
+        "green": -0.5,
+        "green_watch": -1.0,
+        "amber": -1.5,
+        "red": -2.0
+      }
+    }
+  }
+}
