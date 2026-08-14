@@ -275,14 +275,14 @@ extensions:
 
 The adapter does not read plugin state and does not select a pack itself: it
 resolves `engram-coach` by declaring it in the `installed_packs` of a space's
-binding inside an **existing, active Engram binding registry** — this
-package assumes that registry and a session-aware active space already
-exist. Setting up the registry itself, registering a space, and selecting the
-active space are Engram core onboarding concerns, not this plugin's; see
-[`@isparling/engram-omp`](https://github.com/isparling/engram/blob/main/harness/omp/README.md)
-and the
-[external pack interface](https://github.com/isparling/engram/blob/main/harness/docs/pack-interface.md)
-for that setup. This package documents only the pack declaration to add:
+binding inside an **existing, active Engram binding registry**. A complete,
+active binding registry — with a session-aware active space already
+registered and selected — is an external prerequisite; this package neither
+creates nor configures one. Set one up through your own Engram deployment.
+The `installed_packs` declaration syntax itself (the fields below, and how a
+binding declares a pack) is documented in the
+[external pack interface](https://github.com/isparling/engram/blob/main/harness/docs/pack-interface.md).
+This package documents only the pack declaration to add:
 
 ```json
 {
