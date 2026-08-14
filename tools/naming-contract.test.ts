@@ -82,6 +82,7 @@ describe("naming contract", () => {
     const { publicText } = await readPublicFiles();
 
     expect(publicText).not.toMatch(/~\/\.claude\/commands\/engram-coach/);
+    expect(publicText).toContain("/skills/*/SKILL.md");
   });
 
   it("documents the active binding registry prerequisite and required env var for direct OMP integration", async () => {

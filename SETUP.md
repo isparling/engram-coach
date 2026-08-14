@@ -314,13 +314,13 @@ Run these checks to confirm the complete setup is working before invoking a skil
 
 - [ ] **Skills discovered from the plugin cache**
   ```
-  ls ~/.claude/plugins/cache/*/engram-coach/*/skills/
+  ls ~/.claude/plugins/cache/*/engram-coach/*/skills/*/SKILL.md
   ```
-  Should list all ten skill directories: `adapt-plan`, `block-review`, `consult`,
-  `intake`, `lactate-analyze`, `lessons-rollup`, `monitoring-rollup`,
-  `race-analysis`, `season-retrospective`, `set-goal`. Skills are discovered
-  directly from their own `SKILL.md` frontmatter (§6) — there is no separate
-  slash-command registration step to verify.
+  Should list all ten `SKILL.md` files — exactly one for `adapt-plan`, `block-review`,
+  `consult`, `intake`, `lactate-analyze`, `lessons-rollup`, `monitoring-rollup`,
+  `race-analysis`, `season-retrospective`, and `set-goal`. Skills are discovered directly
+  from each file's frontmatter (§6); there is no separate slash-command registration step
+  to verify.
 
 - [ ] **QMD collection present**
   ```

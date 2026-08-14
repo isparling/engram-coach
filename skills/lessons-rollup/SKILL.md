@@ -178,8 +178,8 @@ engram render --view athlete-profile --audience clinician \
 
 The clinician render carries the same facts/uncertainty/actions shape as the other three,
 narrowed to that health-relevant record set. There is no configurable clinical-theme list
-and no persona-fit content in any render — the projection never derives persona-fit at
-all.
+and no dedicated persona-fit field: any authorized persona-fit record is rendered as a
+normal record-derived fact.
 
 ---
 
