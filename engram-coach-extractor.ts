@@ -1,7 +1,7 @@
 /**
  * engram-coach LLM-powered knowledge extractor.
  *
- * Implements the KnowledgeExtractor interface using the peigs LLM helper
+ * Implements the KnowledgeExtractor interface using the Engram harness LLM helper
  * when available. For each turn, the LLM analyzes the conversation and
  * produces structured coaching-aware candidates classified into engram-coach's
  * domain ontology (entity types, decision kinds, training signals, phases,

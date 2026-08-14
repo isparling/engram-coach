@@ -45,6 +45,13 @@ extensions:
   - ./node_modules/@isparling/engram-omp/omp-extension.ts
 ```
 
+This does not include core Engram onboarding. The OMP extension resolves
+`engram-coach` by declaring it in the `installed_packs` of a space's binding
+inside an **existing, active Engram binding registry** — with a session-aware
+active space already registered and selected. That registry is an external
+prerequisite; this package neither creates nor configures one. Set one up
+through your own Engram deployment, then add the pack declaration:
+
 ```json
 {
   "installed_packs": [
@@ -57,6 +64,12 @@ extensions:
   ]
 }
 ```
+
+**Set `ENGRAM_BINDING_REGISTRY`** to the absolute path of that binding
+registry file before starting OMP. It is required, not optional: without it
+the adapter disables knowledge capture entirely for the whole session. See
+[`SETUP.md`](SETUP.md#6-install-the-plugin) (Alternative: Direct OMP
+integration) for the full walkthrough.
 
 ### Verifying the direct OMP integration
 

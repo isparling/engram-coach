@@ -1,9 +1,10 @@
 /**
- * engram-coach federated pack — a self-contained implementation of peigs'
- * pack interfaces. engram-coach owns its domain taxonomy, extraction
- * prompts, validation, and reconciliation logic. peigs never needs to
- * know this pack's name: it is injected at extension load time via
- * `options.pack`.
+ * engram-coach federated pack — a self-contained implementation of the
+ * Engram core's external pack interfaces. engram-coach owns its domain
+ * taxonomy, extraction prompts, validation, and reconciliation logic. The
+ * Engram core never needs to know this pack's name at build time: the CLI
+ * resolves it at runtime as an ordinary Node ESM module, imported from the
+ * `from` specifier a space's binding declares for it in `installed_packs`.
  *
  * The pack implements:
  *   - KnowledgeExtractor.extractCandidates — LLM-powered turn-end extraction
@@ -13,8 +14,9 @@
  *   - PresentationPack — deterministic athlete-profile projection and
  *     audience authorization, defined in `engram-coach-presentation.ts`
  *
- * See peigs `harness/omp-extension-SPEC.md` for the extension contract.
- * See `engram-coach-domain.ts` for the coaching ontology types and constants.
+ * See `@isparling/engram-harness`'s `harness/docs/pack-interface.md` for the
+ * external pack contract. See `engram-coach-domain.ts` for the coaching
+ * ontology types and constants.
  */
 
 import type {

@@ -152,21 +152,34 @@ engram render --view athlete-profile --audience coach \
 Write the athlete render to `{coaching_docs_dir}/ATHLETE_PROFILE.md` and the coach render
 to `{coaching_docs_dir}/COACH_PROFILE.md`.
 
-The split is by audience, not by secrecy. The coach render is the fuller view: every
-active claim, medical included, plus persona-fit reasoning. The athlete render drops
-persona-fit, which is written for the coach rather than for the athlete. Only a claim the
-athlete scopes `visibility: private` is withheld from the coach.
+There is no privacy, visibility, or persona-fit split between these renders. The
+presentation pack authorizes `athlete`, `coach`, and `self-coach` identically — every
+active, retrieval-eligible engram-coach record, unfiltered — and projects the same facts,
+uncertainty, actions, and recommendation IDs into all three. `ATHLETE_PROFILE.md` and
+`COACH_PROFILE.md` are the same content under a different title. `self-coach` is that same
+audience again, for an athlete acting as their own coach; this skill does not keep it as a
+standing file, but it renders on demand identically to the other two:
 
-A third audience exists when the space configures `clinicalThemes`. It is rendered on
-demand rather than kept as a standing file, because a doctor-prep summary is episodic:
+```bash
+engram render --view athlete-profile --audience self-coach \
+  --delivery profile-markdown --model orchestrator/manual
+```
+
+A fourth audience, `clinician`, is the only one that actually filters: monitoring
+captures, lactate tests, and any record (workout adaptations included) carrying a
+health-relevant training signal (HRV, resting HR, lactate threshold, sleep, stress,
+illness, injury). It is rendered on demand rather than kept as a standing file, because a
+doctor-prep summary is episodic:
 
 ```bash
 engram render --view athlete-profile --audience clinician \
   --delivery profile-markdown --model orchestrator/manual
 ```
 
-The clinician sees the configured clinical themes only — no session ceilings, no
-persona-fit — and still never sees a claim scoped `private`.
+The clinician render carries the same facts/uncertainty/actions shape as the other three,
+narrowed to that health-relevant record set. There is no configurable clinical-theme list
+and no persona-fit content in any render — the projection never derives persona-fit at
+all.
 
 ---
 
@@ -179,5 +192,5 @@ persona-fit — and still never sees a claim scoped `private`.
 | Non-additive gate | Enforced by `rollup preview`/`approve`, not by this skill; approval is bound to the previewed plan and refused as `stale_approval` if anything moved |
 | Standalone is read-only on log | Standalone mode skips Phase 1 — no append, only re-curation |
 | Profiles are generated | `ATHLETE_PROFILE.md` and `COACH_PROFILE.md` are rendered artifacts; hand edits are overwritten by the next render. Change a claim record, not the file |
-| Both profiles or neither | Reading skills need the union: the athlete render holds private claims, the coach render holds persona-fit |
+| Profiles are identical | `ATHLETE_PROFILE.md` and `COACH_PROFILE.md` carry the same record-derived content — the `athlete`, `coach`, and `self-coach` audiences authorize identically, so there is no private-vs-full split to reconcile |
 | qmd is the harness's | Never run `qmd update`/`qmd embed`; a bare invocation indexes every collection on the machine |

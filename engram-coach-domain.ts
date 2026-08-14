@@ -6,7 +6,7 @@
  * reconciler to produce coaching-aware knowledge candidates instead of
  * generic keyword-match blobs.
  *
- * This file has no peigs harness imports — it is a pure domain vocabulary
+ * This file has no Engram harness imports — it is a pure domain vocabulary
  * that the pack module imports and the extension does not need to see.
  *
  * @module engram-coach-domain

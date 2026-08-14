@@ -312,11 +312,15 @@ export ENGRAM_BINDING_REGISTRY=<absolute-path-to-registry.json>
 
 Run these checks to confirm the complete setup is working before invoking a skill.
 
-- [ ] **Slash commands registered**
+- [ ] **Skills discovered from the plugin cache**
   ```
-  ls ~/.claude/commands/engram-coach/
+  ls ~/.claude/plugins/cache/*/engram-coach/*/skills/
   ```
-  Should list `intake.md`, `adapt-plan.md`, `consult.md`, and `block-review.md`.
+  Should list all ten skill directories: `adapt-plan`, `block-review`, `consult`,
+  `intake`, `lactate-analyze`, `lessons-rollup`, `monitoring-rollup`,
+  `race-analysis`, `season-retrospective`, `set-goal`. Skills are discovered
+  directly from their own `SKILL.md` frontmatter (§6) — there is no separate
+  slash-command registration step to verify.
 
 - [ ] **QMD collection present**
   ```
@@ -372,9 +376,9 @@ Once you've run a few skills, your `coaching_docs_dir` will accumulate these doc
 ## 9. Troubleshooting
 
 **`/engram-coach:intake` not appearing in Claude Code autocomplete**
-Confirm the files exist:
+Confirm the skill files exist in the installed plugin cache:
 ```
-ls ~/.claude/commands/engram-coach/
+ls ~/.claude/plugins/cache/*/engram-coach/*/skills/
 ```
 If the skills are missing, re-run the install in Step 6 and restart Claude Code —
 plugins are loaded at session start. Check `/plugin` to confirm engram-coach is
