@@ -100,19 +100,25 @@ process.stdout.write(JSON.stringify({
 
 describe("packed module", () => {
   it("installs from a real npm tarball and resolves through Engram's real pack loader", async () => {
-    const { stdout: packStdout } = await execFileAsync("npm", ["pack", "--json"], { cwd: repoRoot });
-    const inventory: unknown = JSON.parse(packStdout);
-    if (!Array.isArray(inventory) || inventory.length === 0) {
-      throw new Error("npm pack --json produced no inventory");
-    }
-    const manifest = inventory[0] as PackManifest;
-    if (typeof manifest.filename !== "string") {
-      throw new Error('npm pack --json inventory entry is missing a string "filename"');
-    }
-    const tarballPath = resolve(repoRoot, manifest.filename);
-
+    // Both `tarballPath` and `tempDir` are optional: `npm pack` can write the
+    // tarball to disk before the following JSON parse/validation steps run,
+    // so the whole operation — pack, parse, validate, install, resolve —
+    // lives in one try, and `finally` removes whichever artifacts made it
+    // to disk before any step threw.
+    let tarballPath: string | undefined;
     let tempDir: string | undefined;
     try {
+      const { stdout: packStdout } = await execFileAsync("npm", ["pack", "--json"], { cwd: repoRoot });
+      const inventory: unknown = JSON.parse(packStdout);
+      if (!Array.isArray(inventory) || inventory.length === 0) {
+        throw new Error("npm pack --json produced no inventory");
+      }
+      const manifest = inventory[0] as PackManifest;
+      if (typeof manifest.filename !== "string") {
+        throw new Error('npm pack --json inventory entry is missing a string "filename"');
+      }
+      tarballPath = resolve(repoRoot, manifest.filename);
+
       tempDir = await mkdtemp(join(tmpdir(), "engram-coach-pack-"));
 
       await writeFile(
@@ -155,7 +161,7 @@ describe("packed module", () => {
       expect(result.deliveryIds).toContain("profile-markdown");
     } finally {
       if (tempDir !== undefined) await rm(tempDir, { recursive: true, force: true });
-      await rm(tarballPath, { force: true });
+      if (tarballPath !== undefined) await rm(tarballPath, { force: true });
     }
   });
 });

@@ -60,16 +60,21 @@ extensions:
 
 ### Verifying the direct OMP integration
 
-After binding the pack and starting an OMP session, call the `engram_status`
-tool. It reports the binding-selected pack identity and CLI mode:
+Bind the pack, start an OMP session, and complete one full agent turn — the
+adapter resolves the session's active space and pack only inside its first
+`agent_end` handler, not at session start. After that turn settles, call the
+`engram_status` tool. It reports the binding-selected pack identity and CLI
+mode:
 
 ```json
 { "mode": "cli", "pack_id": "engram-coach", "pack_version": "0.1.0" }
 ```
 
-`mode` is always `"cli"`. If `pack_id` is `null`, the active space's binding
-has not resolved `engram-coach`; recheck `ENGRAM_BINDING_REGISTRY` and the
-`installed_packs` declaration above.
+`mode` is always `"cli"`. `pack_id: null` before the first turn has settled
+is expected, not a binding failure — call `engram_status` again after a turn
+completes. If `pack_id` is still `null` after that, the active space's
+binding has not resolved `engram-coach`; recheck `ENGRAM_BINDING_REGISTRY`
+and the `installed_packs` declaration above.
 
 ## Configuration
 
