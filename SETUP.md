@@ -274,10 +274,15 @@ extensions:
 ```
 
 The adapter does not read plugin state and does not select a pack itself: it
-resolves `engram-coach` through the active space's binding in the Engram
-binding registry — a single JSON file of registered space bindings, each of
-which declares its own `installed_packs`. Create or extend a local binding
-file declaring `engram-coach` as an installed pack:
+resolves `engram-coach` by declaring it in the `installed_packs` of a space's
+binding inside an **existing, active Engram binding registry** — this
+package assumes that registry and a session-aware active space already
+exist. Setting up the registry itself, registering a space, and selecting the
+active space are Engram core onboarding concerns, not this plugin's; see
+[`@isparling/engram-omp`](https://github.com/isparling/engram/blob/main/harness/omp/README.md)
+and the
+[external pack interface](https://github.com/isparling/engram/blob/main/harness/docs/pack-interface.md)
+for that setup. This package documents only the pack declaration to add:
 
 ```json
 {
@@ -292,18 +297,10 @@ file declaring `engram-coach` as an installed pack:
 }
 ```
 
-Register that binding into the registry and select it as the active space
-(both require `ENGRAM_BINDING_REGISTRY` to already be set — see below):
-
-```sh
-engram space register --binding <absolute-path-to-binding.json>
-engram space select <space-id>
-```
-
-**Set `ENGRAM_BINDING_REGISTRY`** to the absolute path of the registry file
-before starting OMP (and before running any `engram space` command above). It
-is required, not optional: without it the adapter logs a warning at session
-start and disables knowledge capture entirely for the whole session.
+**Set `ENGRAM_BINDING_REGISTRY`** to the absolute path of that binding
+registry file before starting OMP. It is required, not optional: without it
+the adapter logs a warning at session start and disables knowledge capture
+entirely for the whole session.
 
 ```sh
 export ENGRAM_BINDING_REGISTRY=<absolute-path-to-registry.json>
