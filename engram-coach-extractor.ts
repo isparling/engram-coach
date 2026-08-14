@@ -1,56 +1,56 @@
 /**
- * claw-coach LLM-powered knowledge extractor.
+ * engram-coach LLM-powered knowledge extractor.
  *
  * Implements the KnowledgeExtractor interface using the peigs LLM helper
  * when available. For each turn, the LLM analyzes the conversation and
- * produces structured coaching-aware candidates classified into claw-coach's
+ * produces structured coaching-aware candidates classified into engram-coach's
  * domain ontology (entity types, decision kinds, training signals, phases,
  * personas). Falls back to deterministic keyword matching when the LLM
  * helper is absent.
  *
- * @module claw-coach-extractor
+ * @module engram-coach-extractor
  */
 
-import type { TurnContext, PackHelpers } from "@isparling/peigs-harness/knowledge-types";
+import type { TurnContext, PackHelpers } from "@isparling/engram-harness/knowledge-types";
 import {
-  CLAW_COACH_ENTITY_TYPES,
-  CLAW_COACH_DECISION_KINDS,
-  CLAW_COACH_TRAINING_SIGNALS,
-  CLAW_COACH_TRAINING_PHASES,
-  CLAW_COACH_PERSONAS,
+  ENGRAM_COACH_ENTITY_TYPES,
+  ENGRAM_COACH_DECISION_KINDS,
+  ENGRAM_COACH_TRAINING_SIGNALS,
+  ENGRAM_COACH_TRAINING_PHASES,
+  ENGRAM_COACH_PERSONAS,
   COACHING_TOPIC_HINTS,
-  type ClawCoachDetails,
-  type ClawCoachEntityType,
-  type ClawCoachDecisionKind,
-} from "./claw-coach-domain.ts";
+  type EngramCoachDetails,
+  type EngramCoachEntityType,
+  type EngramCoachDecisionKind,
+} from "./engram-coach-domain.ts";
 
-export const clawCoachPackId = "claw-coach";
-export const clawCoachPackVersion = "0.1.0";
+export const engramCoachPackId = "engram-coach";
+export const engramCoachPackVersion = "0.1.0";
 
 /**
  * System prompt for the LLM-powered extractor.
  *
  * Instructs the LLM to analyze a conversation turn and produce structured
- * coaching observations classified into the claw-coach domain ontology.
+ * coaching observations classified into the engram-coach domain ontology.
  */
-const EXTRACTION_SYSTEM_PROMPT = `You are a coaching domain classifier embedded in the claw-coach coaching system. Your task is to analyze conversation turns and extract structured knowledge candidates about coaching decisions.
+const EXTRACTION_SYSTEM_PROMPT = `You are a coaching domain classifier embedded in the engram-coach coaching system. Your task is to analyze conversation turns and extract structured knowledge candidates about coaching decisions.
 
 ## Domain ontology
 
 ### Entity types — what kind of coaching artifact or concept this turn is about:
-${CLAW_COACH_ENTITY_TYPES.map((t) => `- ${t}`).join("\n")}
+${ENGRAM_COACH_ENTITY_TYPES.map((t) => `- ${t}`).join("\n")}
 
 ### Decision kinds — what type of coaching judgment is being rendered:
-${CLAW_COACH_DECISION_KINDS.map((k) => `- ${k}`).join("\n")}
+${ENGRAM_COACH_DECISION_KINDS.map((k) => `- ${k}`).join("\n")}
 
 ### Training signals — physiological metrics mentioned:
-${CLAW_COACH_TRAINING_SIGNALS.map((s) => `- ${s}`).join("\n")}
+${ENGRAM_COACH_TRAINING_SIGNALS.map((s) => `- ${s}`).join("\n")}
 
 ### Training phases:
-${CLAW_COACH_TRAINING_PHASES.map((p) => `- ${p}`).join("\n")}
+${ENGRAM_COACH_TRAINING_PHASES.map((p) => `- ${p}`).join("\n")}
 
 ### Personas:
-${CLAW_COACH_PERSONAS.map((p) => `- ${p}`).join("\n")}
+${ENGRAM_COACH_PERSONAS.map((p) => `- ${p}`).join("\n")}
 
 ## Classification rules
 
@@ -79,7 +79,7 @@ ${CLAW_COACH_PERSONAS.map((p) => `- ${p}`).join("\n")}
  * Deterministic fallback: check if the turn narrative mentions coaching
  * topics. Returns the most likely entity type based on matched terms.
  */
-function coachingRelevantEntityType(text: string): ClawCoachEntityType | null {
+function coachingRelevantEntityType(text: string): EngramCoachEntityType | null {
   const lower = text.toLowerCase();
 
   // Simple greedy: return null if no topic matched
@@ -133,8 +133,8 @@ function coachingRelevantEntityType(text: string): ClawCoachEntityType | null {
   return "session-execution";
 }
 
-function deterministicDecisionKind(entityType: ClawCoachEntityType): ClawCoachDecisionKind {
-  const map: Record<ClawCoachEntityType, ClawCoachDecisionKind> = {
+function deterministicDecisionKind(entityType: EngramCoachEntityType): EngramCoachDecisionKind {
+  const map: Record<EngramCoachEntityType, EngramCoachDecisionKind> = {
     "workout-adaptation": "workout-adaptation",
     consultation: "consultation-advice",
     "block-review": "block-restructure",
@@ -173,15 +173,15 @@ function parseLlmResponse(raw: string): Record<string, unknown>[] {
 }
 
 /**
- * The claw-coach extractor facet.
+ * The engram-coach extractor facet.
  *
  * Uses LLM when available (via PackHelpers.llm.complete) to produce
  * coaching-aware candidates classified into the domain ontology.
  * Falls back to deterministic keyword matching without LLM.
  */
-export const clawCoachExtractor = {
-  id: clawCoachPackId,
-  version: clawCoachPackVersion,
+export const engramCoachExtractor = {
+  id: engramCoachPackId,
+  version: engramCoachPackVersion,
 
   async extractCandidates(
     turn: TurnContext,
@@ -204,37 +204,37 @@ export const clawCoachExtractor = {
         if (candidates.length > 0) {
           // Enrich each candidate with pack metadata
           return candidates.map((c, i) => {
-            const entityType = (c.entityType as ClawCoachEntityType) ?? "session-execution";
-            const decisionKind = (c.decisionKind as ClawCoachDecisionKind) ?? "workout-adaptation";
+            const entityType = (c.entityType as EngramCoachEntityType) ?? "session-execution";
+            const decisionKind = (c.decisionKind as EngramCoachDecisionKind) ?? "workout-adaptation";
             const statement = (c.statement as string) ?? narrative.slice(0, 300);
             const topics = (c.topics as string[]) ?? ["coaching:observation"];
 
-            const details: ClawCoachDetails = {
+            const details: EngramCoachDetails = {
               skill: undefined,
               entityType,
               decisionKind,
-              trainingSignals: c.trainingSignals as ClawCoachDetails["trainingSignals"],
-              trainingPhase: c.trainingPhase as ClawCoachDetails["trainingPhase"],
-              persona: c.persona as ClawCoachDetails["persona"],
+              trainingSignals: c.trainingSignals as EngramCoachDetails["trainingSignals"],
+              trainingPhase: c.trainingPhase as EngramCoachDetails["trainingPhase"],
+              persona: c.persona as EngramCoachDetails["persona"],
               turnIndex: turn.turnIndex,
               extractionConfidence: "high",
             };
 
             return {
-              id: `claw-coach-turn-${turn.turnIndex}-${i}-${Date.now()}`,
+              id: `engram-coach-turn-${turn.turnIndex}-${i}-${Date.now()}`,
               kind: "decision",
               status: "candidate",
               disposition: "new",
               scope: {
-                space: clawCoachPackId,
+                space: engramCoachPackId,
                 subjects: [],
                 topics,
                 contexts: [],
                 dimensions: {},
               },
-              pack: { id: clawCoachPackId, version: clawCoachPackVersion },
+              pack: { id: engramCoachPackId, version: engramCoachPackVersion },
               sources: [
-                { type: "claw-coach-extractor", ref: `session:${turn.session.id}` },
+                { type: "engram-coach-extractor", ref: `session:${turn.session.id}` },
                 { type: "llm-inference", ref: `turn:${turn.turnIndex}` },
               ],
               session: turn.session,
@@ -259,7 +259,7 @@ export const clawCoachExtractor = {
 
     const decisionKind = deterministicDecisionKind(entityType);
 
-    const details: ClawCoachDetails = {
+    const details: EngramCoachDetails = {
       skill: undefined,
       entityType,
       decisionKind,
@@ -267,7 +267,7 @@ export const clawCoachExtractor = {
       extractionConfidence: "low",
     };
 
-    const id = `claw-coach-turn-${turn.turnIndex}-${Date.now()}`;
+    const id = `engram-coach-turn-${turn.turnIndex}-${Date.now()}`;
     return [
       {
         id,
@@ -275,15 +275,15 @@ export const clawCoachExtractor = {
         status: "candidate",
         disposition: "new",
         scope: {
-          space: clawCoachPackId,
+          space: engramCoachPackId,
           subjects: [],
           topics: ["coaching:observation"],
           contexts: [],
           dimensions: {},
         },
-        pack: { id: clawCoachPackId, version: clawCoachPackVersion },
+        pack: { id: engramCoachPackId, version: engramCoachPackVersion },
         sources: [
-          { type: "claw-coach-extractor", ref: `session:${turn.session.id}` },
+          { type: "engram-coach-extractor", ref: `session:${turn.session.id}` },
         ],
         session: turn.session,
         submittedAt: turn.timestamp,

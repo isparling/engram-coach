@@ -1,5 +1,5 @@
 /**
- * Behavioral tests for the claw-coach domain model, extractor, and
+ * Behavioral tests for the engram-coach domain model, extractor, and
  * reconciliation modules.
  *
  * Exercises the deterministic fallback path (no LLM helper), domain
@@ -16,10 +16,10 @@ import { describe, it, expect } from "vitest";
 // Domain model
 // ---------------------------------------------------------------------------
 
-describe("claw-coach-domain", () => {
+describe("engram-coach-domain", () => {
   it("exports all expected entity types", async () => {
-    const mod = await import("../claw-coach-domain.ts");
-    const types = mod.CLAW_COACH_ENTITY_TYPES;
+    const mod = await import("../engram-coach-domain.ts");
+    const types = mod.ENGRAM_COACH_ENTITY_TYPES;
     expect(types).toContain("workout-adaptation");
     expect(types).toContain("consultation");
     expect(types).toContain("block-review");
@@ -38,8 +38,8 @@ describe("claw-coach-domain", () => {
   });
 
   it("exports the four supported generic personas", async () => {
-    const mod = await import("../claw-coach-domain.ts");
-    expect(mod.CLAW_COACH_PERSONAS).toEqual([
+    const mod = await import("../engram-coach-domain.ts");
+    expect(mod.ENGRAM_COACH_PERSONAS).toEqual([
       "conservative",
       "aggressive",
       "polarized",
@@ -48,8 +48,8 @@ describe("claw-coach-domain", () => {
   });
 
   it("exports all expected decision kinds", async () => {
-    const mod = await import("../claw-coach-domain.ts");
-    expect(mod.CLAW_COACH_DECISION_KINDS).toEqual([
+    const mod = await import("../engram-coach-domain.ts");
+    expect(mod.ENGRAM_COACH_DECISION_KINDS).toEqual([
       "workout-adaptation",
       "consultation-advice",
       "block-restructure",
@@ -61,7 +61,7 @@ describe("claw-coach-domain", () => {
       "profile-claim",
       "setup-decision",
     ]);
-    expect(mod.CLAW_COACH_SKILLS).toEqual([
+    expect(mod.ENGRAM_COACH_SKILLS).toEqual([
       "adapt-plan",
       "consult",
       "block-review",
@@ -76,15 +76,15 @@ describe("claw-coach-domain", () => {
   });
 
   it("maps every entity type to a skill", async () => {
-    const mod = await import("../claw-coach-domain.ts");
-    for (const entityType of mod.CLAW_COACH_ENTITY_TYPES) {
+    const mod = await import("../engram-coach-domain.ts");
+    for (const entityType of mod.ENGRAM_COACH_ENTITY_TYPES) {
       expect(mod.ENTITY_TYPE_TO_SKILL[entityType]).toBeDefined();
     }
   });
 
   it("COACHING_TOPIC_HINTS covers all training signals", async () => {
-    const mod = await import("../claw-coach-domain.ts");
-    for (const signal of mod.CLAW_COACH_TRAINING_SIGNALS) {
+    const mod = await import("../engram-coach-domain.ts");
+    for (const signal of mod.ENGRAM_COACH_TRAINING_SIGNALS) {
       const hasHint = mod.COACHING_TOPIC_HINTS.some(
         (h: string) => signal.includes(h.replace(":", "")) || h.includes(signal),
       );
@@ -98,9 +98,9 @@ describe("claw-coach-domain", () => {
 // Extractor — deterministic fallback
 // ---------------------------------------------------------------------------
 
-describe("claw-coach-extractor (deterministic)", () => {
+describe("engram-coach-extractor (deterministic)", () => {
   it("returns [] for empty narrative", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "test-session", host: "test" },
       turnIndex: 1,
@@ -108,12 +108,12 @@ describe("claw-coach-extractor (deterministic)", () => {
       narrative: "",
       toolCalls: [],
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     expect(result).toEqual([]);
   });
 
   it("returns [] for non-coaching narrative", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "test-session", host: "test" },
       turnIndex: 1,
@@ -121,13 +121,13 @@ describe("claw-coach-extractor (deterministic)", () => {
       narrative: "Looking at photos from the weekend hike. Great views.",
       toolCalls: [],
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     expect(result).toEqual([]);
   });
 
   it("ignores non-coaching content-post language", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
-    const result = await mod.clawCoachExtractor.extractCandidates({
+    const mod = await import("../engram-coach-extractor.ts");
+    const result = await mod.engramCoachExtractor.extractCandidates({
       session: { id: "test-session", host: "test" },
       turnIndex: 9,
       narrative: "Publish.",
@@ -137,7 +137,7 @@ describe("claw-coach-extractor (deterministic)", () => {
   });
 
   it("detects race-report from race narrative", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "test-session", host: "test" },
       turnIndex: 2,
@@ -146,7 +146,7 @@ describe("claw-coach-extractor (deterministic)", () => {
         "The race went better than expected. Held 245W NP for 3 hours despite the headwind on lap 2.",
       toolCalls: [],
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     expect(result).toHaveLength(1);
     const details = result[0].details as Record<string, unknown>;
     expect(details.entityType).toBe("race-report");
@@ -155,7 +155,7 @@ describe("claw-coach-extractor (deterministic)", () => {
   });
 
   it("detects workout-adaptation from delta keywords", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "test-session", host: "test" },
       turnIndex: 3,
@@ -164,7 +164,7 @@ describe("claw-coach-extractor (deterministic)", () => {
         "I think we should modify the prescription for Thursday. Power fade was 12% on the last interval.",
       toolCalls: [],
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     expect(result).toHaveLength(1);
     const details = result[0].details as Record<string, unknown>;
     expect(details.entityType).toBe("workout-adaptation");
@@ -172,7 +172,7 @@ describe("claw-coach-extractor (deterministic)", () => {
   });
 
   it("detects arc-plan from goal/target language", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "test-session", host: "test" },
       turnIndex: 4,
@@ -180,14 +180,14 @@ describe("claw-coach-extractor (deterministic)", () => {
       narrative:
         "My goal for this arc is to build toward an example endurance event. Target event is June 2027.",
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     expect(result).toHaveLength(1);
     const details = result[0].details as Record<string, unknown>;
     expect(details.entityType).toBe("arc-plan");
   });
 
   it("detects lactate-test from threshold language", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "test-session", host: "test" },
       turnIndex: 5,
@@ -196,7 +196,7 @@ describe("claw-coach-extractor (deterministic)", () => {
         "Just got my lactate test results. LT2 is 245W, FTP at 258W. Up 10W from last test.",
       toolCalls: [],
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     expect(result).toHaveLength(1);
     const details = result[0].details as Record<string, unknown>;
     expect(details.entityType).toBe("lactate-test");
@@ -204,7 +204,7 @@ describe("claw-coach-extractor (deterministic)", () => {
   });
 
   it("detects consultation from consult/advice language", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "test-session", host: "test" },
       turnIndex: 6,
@@ -213,7 +213,7 @@ describe("claw-coach-extractor (deterministic)", () => {
         "I need some advice. I've been fighting a cold and my HRV has dropped for 4 days straight.",
       toolCalls: [],
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     expect(result).toHaveLength(1);
     const details = result[0].details as Record<string, unknown>;
     expect(details.entityType).toBe("consultation");
@@ -221,7 +221,7 @@ describe("claw-coach-extractor (deterministic)", () => {
   });
 
   it("detects persona-fit from persona language", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "test-session", host: "test" },
       turnIndex: 7,
@@ -230,7 +230,7 @@ describe("claw-coach-extractor (deterministic)", () => {
         "I think the aggressive persona isn't working for me right now. Let's switch to conservative.",
       toolCalls: [],
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     expect(result).toHaveLength(1);
     const details = result[0].details as Record<string, unknown>;
     expect(details.entityType).toBe("persona-fit");
@@ -238,7 +238,7 @@ describe("claw-coach-extractor (deterministic)", () => {
   });
 
   it("enriches candidates with pack metadata", async () => {
-    const mod = await import("../claw-coach-extractor.ts");
+    const mod = await import("../engram-coach-extractor.ts");
     const turn = {
       session: { id: "session-abc", host: "omp" },
       turnIndex: 8,
@@ -247,13 +247,13 @@ describe("claw-coach-extractor (deterministic)", () => {
         "HRV is trending down. RHR up 3bpm. Might need a recovery week.",
       toolCalls: [],
     };
-    const result = await mod.clawCoachExtractor.extractCandidates(turn, {});
+    const result = await mod.engramCoachExtractor.extractCandidates(turn, {});
     const c = result[0];
     expect(c).toHaveProperty("id");
     expect(c).toHaveProperty("kind", "decision");
     expect(c).toHaveProperty("status", "candidate");
     expect((c as Record<string, unknown>).pack).toEqual({
-      id: "claw-coach",
+      id: "engram-coach",
       version: "0.1.0",
     });
     expect((c as Record<string, unknown>).session).toEqual({
@@ -261,7 +261,7 @@ describe("claw-coach-extractor (deterministic)", () => {
       host: "omp",
     });
     expect((c as Record<string, unknown>).sources).toEqual([
-      { type: "claw-coach-extractor", ref: "session:session-abc" },
+      { type: "engram-coach-extractor", ref: "session:session-abc" },
     ]);
   });
 });
@@ -272,7 +272,7 @@ describe("claw-coach-extractor (deterministic)", () => {
 
 describe("validateEnvelope", () => {
   it("accepts a valid envelope", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = {
       id: "test-1",
       kind: "decision",
@@ -284,13 +284,13 @@ describe("validateEnvelope", () => {
         turnIndex: 1,
       },
       scope: {
-        space: "claw-coach",
+        space: "engram-coach",
         subjects: [],
         topics: ["coaching:observation"],
         contexts: [],
         dimensions: {},
       },
-      pack: { id: "claw-coach", version: "0.1.0" },
+      pack: { id: "engram-coach", version: "0.1.0" },
       sources: [{ type: "test", ref: "test" }],
       session: { id: "s", host: "h" },
       submittedAt: new Date().toISOString(),
@@ -301,7 +301,7 @@ describe("validateEnvelope", () => {
   });
 
   it("rejects empty statement", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = {
       id: "test-2",
       kind: "decision",
@@ -323,7 +323,7 @@ describe("validateEnvelope", () => {
   });
 
   it("rejects unknown entity type", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = {
       id: "test-3",
       kind: "decision",
@@ -345,7 +345,7 @@ describe("validateEnvelope", () => {
   });
 
   it("rejects unknown decision kind", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = {
       id: "test-4",
       kind: "decision",
@@ -370,7 +370,7 @@ describe("validateEnvelope", () => {
   });
 
   it("rejects an unknown persona", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = {
       id: "test-5",
       kind: "decision",
@@ -396,7 +396,7 @@ describe("validateEnvelope", () => {
   });
 
   it("rejects unknown training phase", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = {
       id: "test-6",
       kind: "decision",
@@ -422,7 +422,7 @@ describe("validateEnvelope", () => {
   });
 
   it("rejects unprefixed topic", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = {
       id: "test-7",
       kind: "decision",
@@ -482,7 +482,7 @@ function makeRecord(overrides: Record<string, unknown>) {
 
 describe("reconcile", () => {
   it("accepts new candidate with no related records (disposition: new)", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const candidate = makeEnvelope({});
     const result = mod.reconcile({ candidate: candidate as never, related: [] });
     expect(result.ok).toBe(true);
@@ -492,7 +492,7 @@ describe("reconcile", () => {
   });
 
   it("dedupes identical statement (disposition: no-change)", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const candidate = makeEnvelope({
       id: "cand-2",
       statement: "identical observation",
@@ -508,7 +508,7 @@ describe("reconcile", () => {
   });
 
   it("supersedes prior lactate test result", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const candidate = makeEnvelope({
       id: "cand-lt-new",
       statement: "LT2 now 255W, FTP 268W",
@@ -536,7 +536,7 @@ describe("reconcile", () => {
   });
 
   it("supersedes prior persona-fit record", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const candidate = makeEnvelope({
       id: "cand-p-new",
       statement: "Switching to aggressive persona for build phase",
@@ -559,7 +559,7 @@ describe("reconcile", () => {
   });
 
   it("refines same entity type with different statement", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const candidate = makeEnvelope({
       id: "cand-3",
       statement: "Another adaptation note for this block",
@@ -581,7 +581,7 @@ describe("reconcile", () => {
   });
 
   it("supports complementary entity types from same skill", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const candidate = makeEnvelope({
       id: "cand-4",
       statement: "Session execution note for arc-plan cycle",
@@ -609,7 +609,7 @@ describe("reconcile", () => {
 
 describe("relatedQuery", () => {
   it("builds query from entity type and persona", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = makeEnvelope({
       details: {
         entityType: "lactate-test",
@@ -624,7 +624,7 @@ describe("relatedQuery", () => {
   });
 
   it("falls back to statement when no details fields", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = makeEnvelope({
       details: {},
       statement: "power fade during threshold intervals",
@@ -634,7 +634,7 @@ describe("relatedQuery", () => {
   });
 
   it("includes training signals in query", async () => {
-    const mod = await import("../claw-coach-reconciliation.ts");
+    const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = makeEnvelope({
       details: {
         entityType: "workout-adaptation",
@@ -645,5 +645,17 @@ describe("relatedQuery", () => {
     expect(query).toContain("hrv");
     expect(query).toContain("tsb");
     expect(query).toContain("decoupling");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pack identity
+// ---------------------------------------------------------------------------
+
+describe("engram-coach-pack", () => {
+  it("exports the published Engram Coach pack identity", async () => {
+    const mod = await import("../engram-coach-pack.ts");
+    expect(mod.engramCoachPack.id).toBe("engram-coach");
+    expect(mod.default).toBe(mod.engramCoachPack);
   });
 });

@@ -1,10 +1,27 @@
 {
-  "name": "@isparling/claw-coach",
+  "name": "@isparling/engram-coach",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
-  "description": "Federated claw-coach OMP extension — owns its interaction with peigs via the extension pack interface.",
-  "dependencies": {
-    "@isparling/peigs-harness": "file:../peigs/harness"
+  "description": "Engram external pack for document-driven endurance coaching.",
+  "exports": { ".": { "import": "./engram-coach-pack.ts" } },
+  "files": [
+    "engram-coach-domain.ts",
+    "engram-coach-extractor.ts",
+    "engram-coach-reconciliation.ts",
+    "engram-coach-presentation.ts",
+    "engram-coach-pack.ts",
+    "README.md"
+  ],
+  "peerDependencies": { "@isparling/engram-harness": "^0.1.0" },
+  "devDependencies": {
+    "@isparling/engram-harness": "file:../engram/harness",
+    "typescript": "^7.0.2"
+  },
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "test": "npm test --prefix tools",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pack:local": "npm pack --json"
   }
 }

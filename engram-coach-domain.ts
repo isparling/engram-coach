@@ -1,7 +1,7 @@
 /**
- * claw-coach domain model — coaching ontology types and constants.
+ * engram-coach domain model — coaching ontology types and constants.
  *
- * Captures the LLM-driven semantics of claw-coach's 10 skills as a
+ * Captures the LLM-driven semantics of engram-coach's 10 skills as a
  * structured type system. Used by the pack's extractor, validator, and
  * reconciler to produce coaching-aware knowledge candidates instead of
  * generic keyword-match blobs.
@@ -9,7 +9,7 @@
  * This file has no peigs harness imports — it is a pure domain vocabulary
  * that the pack module imports and the extension does not need to see.
  *
- * @module claw-coach-domain
+ * @module engram-coach-domain
  */
 
 // ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@
 // Every extraction candidate carries one entity type in details.entityType.
 // ---------------------------------------------------------------------------
 
-export const CLAW_COACH_ENTITY_TYPES = [
+export const ENGRAM_COACH_ENTITY_TYPES = [
   "workout-adaptation",    // adapt-plan: per-session adjustment
   "consultation",          // consult: mid-arc advice seeking
   "block-review",          // block-review: end-of-block SUMMARY.md
@@ -34,13 +34,13 @@ export const CLAW_COACH_ENTITY_TYPES = [
   "session-execution",     // raw session data (prescription vs actual)
 ] as const;
 
-export type ClawCoachEntityType = (typeof CLAW_COACH_ENTITY_TYPES)[number];
+export type EngramCoachEntityType = (typeof ENGRAM_COACH_ENTITY_TYPES)[number];
 
 // ---------------------------------------------------------------------------
 // Decision kinds — the type of coaching judgment being rendered.
 // ---------------------------------------------------------------------------
 
-export const CLAW_COACH_DECISION_KINDS = [
+export const ENGRAM_COACH_DECISION_KINDS = [
   "workout-adaptation",    // adjusting a specific session's prescription
   "consultation-advice",   // mid-arc advisory response
   "block-restructure",     // changing a block's structure mid-cycle
@@ -53,13 +53,13 @@ export const CLAW_COACH_DECISION_KINDS = [
   "setup-decision",        // intake/configuration decisions
 ] as const;
 
-export type ClawCoachDecisionKind = (typeof CLAW_COACH_DECISION_KINDS)[number];
+export type EngramCoachDecisionKind = (typeof ENGRAM_COACH_DECISION_KINDS)[number];
 
 // ---------------------------------------------------------------------------
 // Training signals — physiological metrics the skills track and reason about.
 // ---------------------------------------------------------------------------
 
-export const CLAW_COACH_TRAINING_SIGNALS = [
+export const ENGRAM_COACH_TRAINING_SIGNALS = [
   "ctl",              // chronic training load
   "atl",              // acute training load
   "tsb",              // training stress balance
@@ -79,13 +79,13 @@ export const CLAW_COACH_TRAINING_SIGNALS = [
   "injury",           // physical injury / discomfort
 ] as const;
 
-export type ClawCoachTrainingSignal = (typeof CLAW_COACH_TRAINING_SIGNALS)[number];
+export type EngramCoachTrainingSignal = (typeof ENGRAM_COACH_TRAINING_SIGNALS)[number];
 
 // ---------------------------------------------------------------------------
 // Training phases — position within a training cycle.
 // ---------------------------------------------------------------------------
 
-export const CLAW_COACH_TRAINING_PHASES = [
+export const ENGRAM_COACH_TRAINING_PHASES = [
   "base",
   "build-1",
   "build-2",
@@ -96,26 +96,26 @@ export const CLAW_COACH_TRAINING_PHASES = [
   "unknown",
 ] as const;
 
-export type ClawCoachTrainingPhase = (typeof CLAW_COACH_TRAINING_PHASES)[number];
+export type EngramCoachTrainingPhase = (typeof ENGRAM_COACH_TRAINING_PHASES)[number];
 
 // ---------------------------------------------------------------------------
 // Personas — coaching philosophies.
 // ---------------------------------------------------------------------------
 
-export const CLAW_COACH_PERSONAS = [
+export const ENGRAM_COACH_PERSONAS = [
   "conservative",
   "aggressive",
   "polarized",
   "volume",
 ] as const;
 
-export type ClawCoachPersona = (typeof CLAW_COACH_PERSONAS)[number];
+export type EngramCoachPersona = (typeof ENGRAM_COACH_PERSONAS)[number];
 
 // ---------------------------------------------------------------------------
-// Skills — the 10 claw-coach skills that generate knowledge.
+// Skills — the 10 engram-coach skills that generate knowledge.
 // ---------------------------------------------------------------------------
 
-export const CLAW_COACH_SKILLS = [
+export const ENGRAM_COACH_SKILLS = [
   "adapt-plan",
   "consult",
   "block-review",
@@ -128,13 +128,13 @@ export const CLAW_COACH_SKILLS = [
   "set-goal",
 ] as const;
 
-export type ClawCoachSkill = (typeof CLAW_COACH_SKILLS)[number];
+export type EngramCoachSkill = (typeof ENGRAM_COACH_SKILLS)[number];
 
 // ---------------------------------------------------------------------------
 // Entity-type to skill mapping — which skill produces which entity types.
 // ---------------------------------------------------------------------------
 
-export const ENTITY_TYPE_TO_SKILL: Record<ClawCoachEntityType, ClawCoachSkill> = {
+export const ENTITY_TYPE_TO_SKILL: Record<EngramCoachEntityType, EngramCoachSkill> = {
   "workout-adaptation": "adapt-plan",
   consultation: "consult",
   "block-review": "block-review",
@@ -152,28 +152,28 @@ export const ENTITY_TYPE_TO_SKILL: Record<ClawCoachEntityType, ClawCoachSkill> =
 };
 
 // ---------------------------------------------------------------------------
-// ClawCoachDetails — the structured `details` payload carried in every
-// claw-coach extraction candidate.
+// EngramCoachDetails — the structured `details` payload carried in every
+// engram-coach extraction candidate.
 // ---------------------------------------------------------------------------
 
-export type ClawCoachDetails = {
-  /** Which claw-coach skill produced this candidate. */
-  skill?: ClawCoachSkill;
+export type EngramCoachDetails = {
+  /** Which engram-coach skill produced this candidate. */
+  skill?: EngramCoachSkill;
 
   /** What kind of coaching entity. */
-  entityType: ClawCoachEntityType;
+  entityType: EngramCoachEntityType;
 
   /** The specific coaching decision being made. */
-  decisionKind: ClawCoachDecisionKind;
+  decisionKind: EngramCoachDecisionKind;
 
   /** Physiological signals mentioned or involved. */
-  trainingSignals?: ClawCoachTrainingSignal[];
+  trainingSignals?: EngramCoachTrainingSignal[];
 
   /** Training phase context, if identifiable. */
-  trainingPhase?: ClawCoachTrainingPhase;
+  trainingPhase?: EngramCoachTrainingPhase;
 
   /** Active persona at the time of extraction. */
-  persona?: ClawCoachPersona;
+  persona?: EngramCoachPersona;
 
   /**
    * Structured delta — what changed vs. what was planned.
@@ -222,7 +222,7 @@ export const COACHING_TOPIC_HINTS = [
 // Skill-to-topic mapping — which skill a mention of a topic likely refers to.
 // ---------------------------------------------------------------------------
 
-export const SKILL_TOPIC_MAP: Record<ClawCoachSkill, string[]> = {
+export const SKILL_TOPIC_MAP: Record<EngramCoachSkill, string[]> = {
   "adapt-plan": ["adapt", "workout", "session", "prescription", "modify", "delta", "next workout"],
   consult: ["consult", "advice", "concern", "question", "sick", "illness", "life stress"],
   "block-review": ["block summary", "summary", "block end", "week progression"],

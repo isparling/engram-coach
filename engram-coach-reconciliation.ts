@@ -1,8 +1,8 @@
 /**
- * claw-coach domain-aware validation and reconciliation.
+ * engram-coach domain-aware validation and reconciliation.
  *
  * Implements the KnowledgePack facets with full awareness of the coaching
- * domain ontology defined in claw-coach-domain.ts.
+ * domain ontology defined in engram-coach-domain.ts.
  *
  * - validateEnvelope: validates candidates against known entity types,
  *   decision kinds, statement requirements, and detail structure.
@@ -11,7 +11,7 @@
  *   same-block observations support each other, duplicate statements are
  *   deduped, and identical claims from different sources get merged.
  *
- * @module claw-coach-reconciliation
+ * @module engram-coach-reconciliation
  */
 
 import type {
@@ -20,16 +20,16 @@ import type {
   PackReconciliation,
   PackReconcileInput,
   KnowledgeRecord,
-} from "../peigs/harness/src/knowledgeTypes.ts";
+} from "@isparling/engram-harness/knowledge-types";
 import {
-  CLAW_COACH_ENTITY_TYPES,
-  CLAW_COACH_DECISION_KINDS,
-  CLAW_COACH_TRAINING_PHASES,
-  CLAW_COACH_PERSONAS,
+  ENGRAM_COACH_ENTITY_TYPES,
+  ENGRAM_COACH_DECISION_KINDS,
+  ENGRAM_COACH_TRAINING_PHASES,
+  ENGRAM_COACH_PERSONAS,
   ENTITY_TYPE_TO_SKILL,
-  type ClawCoachDetails,
-  type ClawCoachEntityType,
-} from "./claw-coach-domain.ts";
+  type EngramCoachDetails,
+  type EngramCoachEntityType,
+} from "./engram-coach-domain.ts";
 
 // ---------------------------------------------------------------------------
 // Known destination topics used when validating scope topics.
@@ -46,12 +46,12 @@ const KNOWN_TOPIC_PREFIXES = [
 ];
 
 /**
- * Validate a claw-coach knowledge envelope against the domain ontology.
+ * Validate an engram-coach knowledge envelope against the domain ontology.
  *
  * Checks:
  * - Statement is non-empty and within length limits
- * - entityType is a known claw-coach entity type
- * - decisionKind is a known claw-coach decision kind
+ * - entityType is a known engram-coach entity type
+ * - decisionKind is a known engram-coach decision kind
  * - trainingPhase (if present) is a known phase
  * - persona (if present) is a known persona
  * - topics use known prefixes
@@ -81,31 +81,31 @@ export function validateEnvelope(
   }
 
   // --- Details checks ---
-  const details = envelope.details as Partial<ClawCoachDetails> | undefined;
+  const details = envelope.details as Partial<EngramCoachDetails> | undefined;
 
   if (details) {
     const entityType = details.entityType;
-    if (entityType && !((CLAW_COACH_ENTITY_TYPES as readonly string[]).includes(entityType))) {
+    if (entityType && !((ENGRAM_COACH_ENTITY_TYPES as readonly string[]).includes(entityType))) {
       errors.push({
         kind: "validation",
         code: "unknown_entity_type",
         field: "details.entityType",
-        message: `"${entityType}" is not a known claw-coach entity type`,
+        message: `"${entityType}" is not a known engram-coach entity type`,
       });
     }
 
     const decisionKind = details.decisionKind;
-    if (decisionKind && !((CLAW_COACH_DECISION_KINDS as readonly string[]).includes(decisionKind))) {
+    if (decisionKind && !((ENGRAM_COACH_DECISION_KINDS as readonly string[]).includes(decisionKind))) {
       errors.push({
         kind: "validation",
         code: "unknown_decision_kind",
         field: "details.decisionKind",
-        message: `"${decisionKind}" is not a known claw-coach decision kind`,
+        message: `"${decisionKind}" is not a known engram-coach decision kind`,
       });
     }
 
     const trainingPhase = details.trainingPhase;
-    if (trainingPhase && !((CLAW_COACH_TRAINING_PHASES as readonly string[]).includes(trainingPhase))) {
+    if (trainingPhase && !((ENGRAM_COACH_TRAINING_PHASES as readonly string[]).includes(trainingPhase))) {
       errors.push({
         kind: "validation",
         code: "unknown_training_phase",
@@ -115,7 +115,7 @@ export function validateEnvelope(
     }
 
     const persona = details.persona;
-    if (persona && !((CLAW_COACH_PERSONAS as readonly string[]).includes(persona))) {
+    if (persona && !((ENGRAM_COACH_PERSONAS as readonly string[]).includes(persona))) {
       errors.push({
         kind: "validation",
         code: "unknown_persona",
@@ -150,8 +150,8 @@ export function validateEnvelope(
 /**
  * Infer the entity type from a knowledge record's details.
  */
-function entityTypeFromRecord(record: KnowledgeRecord): ClawCoachEntityType | null {
-  const details = record.details as Partial<ClawCoachDetails> | undefined;
+function entityTypeFromRecord(record: KnowledgeRecord): EngramCoachEntityType | null {
+  const details = record.details as Partial<EngramCoachDetails> | undefined;
   return details?.entityType ?? null;
 }
 
@@ -170,7 +170,7 @@ export function reconcile(
 ): KnowledgeResult<PackReconciliation> {
   const candidate = input.candidate;
   const related = input.related;
-  const candidateDetails = candidate.details as Partial<ClawCoachDetails> | undefined;
+  const candidateDetails = candidate.details as Partial<EngramCoachDetails> | undefined;
   const candidateEntityType = candidateDetails?.entityType;
 
   // No related records → accept as new
@@ -180,8 +180,8 @@ export function reconcile(
       value: {
         disposition: "new",
         summary: candidateEntityType
-          ? `claw-coach accepted new ${candidateEntityType} observation`
-          : "claw-coach accepted new coaching observation",
+          ? `engram-coach accepted new ${candidateEntityType} observation`
+          : "engram-coach accepted new coaching observation",
         mutations: [],
       },
     };
@@ -189,7 +189,7 @@ export function reconcile(
 
   // --- Semantic matching against related records ---
   const latest = related[0];
-  const latestDetails = latest.details as Partial<ClawCoachDetails> | undefined;
+  const latestDetails = latest.details as Partial<EngramCoachDetails> | undefined;
   const latestEntityType = latestDetails?.entityType;
 
   // 1. Identical statement → no-change (dedupe)
@@ -290,7 +290,7 @@ export function reconcile(
     ok: true,
     value: {
       disposition: "new",
-      summary: "claw-coach accepted a coaching observation (no direct relationship to prior records)",
+      summary: "engram-coach accepted a coaching observation (no direct relationship to prior records)",
       mutations: [],
     },
   };
@@ -300,7 +300,7 @@ export function reconcile(
  * Build a query string from an envelope for finding related records.
  */
 export function relatedQuery(envelope: KnowledgeEnvelope): string {
-  const details = envelope.details as Partial<ClawCoachDetails> | undefined;
+  const details = envelope.details as Partial<EngramCoachDetails> | undefined;
   const entityType = details?.entityType;
   const persona = details?.persona;
   const trainingPhase = details?.trainingPhase;
