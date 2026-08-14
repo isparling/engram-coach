@@ -257,14 +257,6 @@ Restart Claude Code. Type `/engram-coach` — all ten skills should appear:
 `lessons-rollup`, `monitoring-rollup`, `race-analysis`,
 `season-retrospective`, `set-goal`.
 
-> **Migrating from the old symlink install?** Earlier versions registered
-> commands via `ln -s /path/to/engram-coach/commands ~/.claude/commands/engram-coach`
-> and a `make install-skills` symlink into `~/.claude/skills/`. Both are
-> superseded. Once the plugin is verified, remove them:
-> `rm ~/.claude/commands/engram-coach` and delete any `~/.claude/skills/*` symlinks
-> pointing into a coaching repo. Leaving them in place risks a stale duplicate
-> shadowing the plugin.
-
 ### Alternative: Direct OMP integration
 
 Instead of (or in addition to) the Claude Code plugin, `engram-coach` can be
@@ -281,7 +273,11 @@ extensions:
   - ./node_modules/@isparling/engram-omp/omp-extension.ts
 ```
 
-Register the pack in OMP's installed-packs configuration:
+The adapter does not read plugin state and does not select a pack itself: it
+resolves `engram-coach` through the active space's binding in the Engram
+binding registry — a single JSON file of registered space bindings, each of
+which declares its own `installed_packs`. Create or extend a local binding
+file declaring `engram-coach` as an installed pack:
 
 ```json
 {
@@ -294,6 +290,23 @@ Register the pack in OMP's installed-packs configuration:
     }
   ]
 }
+```
+
+Register that binding into the registry and select it as the active space
+(both require `ENGRAM_BINDING_REGISTRY` to already be set — see below):
+
+```sh
+engram space register --binding <absolute-path-to-binding.json>
+engram space select <space-id>
+```
+
+**Set `ENGRAM_BINDING_REGISTRY`** to the absolute path of the registry file
+before starting OMP (and before running any `engram space` command above). It
+is required, not optional: without it the adapter logs a warning at session
+start and disables knowledge capture entirely for the whole session.
+
+```sh
+export ENGRAM_BINDING_REGISTRY=<absolute-path-to-registry.json>
 ```
 
 ---
