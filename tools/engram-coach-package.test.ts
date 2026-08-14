@@ -100,15 +100,22 @@ process.stdout.write(JSON.stringify({
 
 describe("packed module", () => {
   it("installs from a real npm tarball and resolves through Engram's real pack loader", async () => {
-    // Both `tarballPath` and `tempDir` are optional: `npm pack` can write the
-    // tarball to disk before the following JSON parse/validation steps run,
-    // so the whole operation — pack, parse, validate, install, resolve —
-    // lives in one try, and `finally` removes whichever artifacts made it
-    // to disk before any step threw.
-    let tarballPath: string | undefined;
+    // `packDir` is a dedicated destination for `npm pack`, created before
+    // pack runs and owned by `finally` independently of whether the JSON
+    // output that follows ever parses or validates — a `.tgz` written to
+    // disk during a later failure is still removed because it can only ever
+    // land inside this directory. `tempDir` (the separate consumer install)
+    // is tracked the same way.
+    let packDir: string | undefined;
     let tempDir: string | undefined;
     try {
-      const { stdout: packStdout } = await execFileAsync("npm", ["pack", "--json"], { cwd: repoRoot });
+      packDir = await mkdtemp(join(tmpdir(), "engram-coach-tarball-"));
+
+      const { stdout: packStdout } = await execFileAsync(
+        "npm",
+        ["pack", "--json", "--pack-destination", packDir],
+        { cwd: repoRoot },
+      );
       const inventory: unknown = JSON.parse(packStdout);
       if (!Array.isArray(inventory) || inventory.length === 0) {
         throw new Error("npm pack --json produced no inventory");
@@ -117,7 +124,7 @@ describe("packed module", () => {
       if (typeof manifest.filename !== "string") {
         throw new Error('npm pack --json inventory entry is missing a string "filename"');
       }
-      tarballPath = resolve(repoRoot, manifest.filename);
+      const tarballPath = resolve(packDir, manifest.filename);
 
       tempDir = await mkdtemp(join(tmpdir(), "engram-coach-pack-"));
 
@@ -161,7 +168,7 @@ describe("packed module", () => {
       expect(result.deliveryIds).toContain("profile-markdown");
     } finally {
       if (tempDir !== undefined) await rm(tempDir, { recursive: true, force: true });
-      if (tarballPath !== undefined) await rm(tarballPath, { force: true });
+      if (packDir !== undefined) await rm(packDir, { recursive: true, force: true });
     }
   });
 });
