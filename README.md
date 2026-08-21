@@ -83,9 +83,11 @@ mode:
 { "mode": "cli", "pack_id": "engram-coach", "pack_version": "0.1.0" }
 ```
 
-`mode` is always `"cli"`. `pack_id: null` before the first turn has settled
-is expected, not a binding failure — call `engram_status` again after a turn
-completes. If `pack_id` is still `null` after that, the active space's
+`mode` is always `"cli"` — the adapter shells out to the Engram CLI and
+never injects knowledge directly into context. `pack_id: null` before the
+first turn has settled is expected, not a binding failure — call
+`engram_status` again after a turn completes.
+If `pack_id` is still `null` after that, the active space's
 binding has not resolved `engram-coach`; recheck `ENGRAM_BINDING_REGISTRY`
 and the `installed_packs` declaration above.
 
