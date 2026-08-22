@@ -32,6 +32,7 @@ import {
   reconcile,
   relatedQuery,
 } from "./engram-coach-reconciliation.ts";
+export { captureFromTurn } from "./capture-handler.ts";
 
 export const engramCoachPackId = "engram-coach";
 export const engramCoachPackVersion = "0.1.0";

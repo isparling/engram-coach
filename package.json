@@ -4,21 +4,31 @@
   "private": false,
   "type": "module",
   "description": "Engram external pack for document-driven endurance coaching.",
-  "exports": { ".": { "import": "./engram-coach-pack.ts" } },
+  "exports": {
+    ".": {
+      "import": "./engram-coach-pack.ts"
+    }
+  },
   "files": [
     "engram-coach-domain.ts",
     "engram-coach-extractor.ts",
     "engram-coach-reconciliation.ts",
     "engram-coach-presentation.ts",
     "engram-coach-pack.ts",
+    "capture-handler.ts",
     "README.md"
   ],
-  "peerDependencies": { "@isparling/engram-harness": "^0.1.0" },
+  "peerDependencies": {
+    "@isparling/engram-harness": "^0.1.0"
+  },
   "devDependencies": {
     "@isparling/engram-harness": "file:../engram/harness",
+    "@types/node": "^26.2.0",
     "typescript": "^7.0.2"
   },
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "test": "npm test --prefix tools",
     "typecheck": "tsc --noEmit -p tsconfig.json",

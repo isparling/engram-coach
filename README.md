@@ -74,22 +74,28 @@ integration) for the full walkthrough.
 ### Verifying the direct OMP integration
 
 Bind the pack, start an OMP session, and complete one full agent turn — the
-adapter resolves the session's active space and pack only inside its first
-`agent_end` handler, not at session start. After that turn settles, call the
-`engram_status` tool. It reports the binding-selected pack identity and CLI
-mode:
+adapter resolves the session's active space and pack inside its awaited
+`session_stop` final-settle hook, not at session start. After that turn
+settles, call the `engram_status` tool. It reports the binding-selected pack
+identity and CLI mode:
 
 ```json
 { "mode": "cli", "pack_id": "engram-coach", "pack_version": "0.1.0" }
 ```
 
-`mode` is always `"cli"` — the adapter shells out to the Engram CLI and
-never injects knowledge directly into context. `pack_id: null` before the
-first turn has settled is expected, not a binding failure — call
-`engram_status` again after a turn completes.
-If `pack_id` is still `null` after that, the active space's
-binding has not resolved `engram-coach`; recheck `ENGRAM_BINDING_REGISTRY`
-and the `installed_packs` declaration above.
+`mode` is always `"cli"` because the CLI remains the space-resolution and
+fallback control plane; the adapter never injects knowledge directly into
+model context. `pack_id: null` before the first turn has settled is expected,
+not a binding failure. If it remains `null` afterwards, recheck
+`ENGRAM_BINDING_REGISTRY`, the session's active-space selection, and the
+`installed_packs` declaration above.
+
+For settled turns containing coaching knowledge, this pack's exported
+`captureFromTurn` handler creates a parseable `status: "candidate"` draft in
+the active space's records root and refreshes that space's scoped qmd index.
+Create-only writes make repeated settlement idempotent. Candidate drafts are
+excluded from recall and profile presentation until explicitly promoted to
+`status: "active"`.
 
 ## Configuration
 

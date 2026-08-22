@@ -306,6 +306,14 @@ entirely for the whole session.
 export ENGRAM_BINDING_REGISTRY=<absolute-path-to-registry.json>
 ```
 
+At each awaited OMP `session_stop`, the extension imports the binding-selected
+pack and calls its optional `captureFromTurn` handler. `engram-coach` turns new
+coaching observations into create-only `status: "candidate"` draft records and
+refreshes the active space's scoped qmd index. Drafts remain excluded from
+recall and all profile renders until explicitly reviewed and promoted to
+`status: "active"`. A pack without this handler retains the generic
+`engram capture-from-turn` CLI fallback.
+
 ---
 
 ## 7. Verification
