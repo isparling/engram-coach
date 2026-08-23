@@ -51,8 +51,8 @@ type PackManifest = { filename: string };
 type ResolverResult = {
   packOk: boolean;
   packErrors: unknown;
-  extractorOk: boolean;
-  extractorErrors: unknown;
+  captureExports: string[];
+  hasExtractCandidates: boolean;
   viewIds: string[];
   audienceIds: string[];
   deliveryIds: string[];
@@ -60,11 +60,14 @@ type ResolverResult = {
 
 // Resolver subprocess: reads the temp binding, imports the real pack loader
 // through the temp install's `file:`-linked harness copy, and resolves the
-// binding-declared pack and extractor exactly as `cli.ts` does. The pack
-// loader itself does the same at runtime — both imports below are
-// necessarily dynamic because the loaded specifier is only known once the
-// binding file has been read, which is precisely the module-loading
-// boundary this test exercises.
+// binding-declared pack exactly as `cli.ts` does, then checks the three
+// binding-selected capture functions the OMP adapter looks up by name.
+// engram-coach is deliberately NOT a generic `KnowledgeExtractor`: ambient
+// capture is LLM-only through `captureFromTurn`. The pack loader itself does
+// the same dynamic import at runtime — both imports below are necessarily
+// dynamic because the loaded specifier is only known once the binding file
+// has been read, which is precisely the module-loading boundary this test
+// exercises.
 const RESOLVER_SCRIPT = `
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
@@ -80,18 +83,22 @@ const packLoaderPath = join(
   "src",
   "packLoader.ts",
 );
-const { resolveKnowledgePack, loadExtractionPack } = await import(pathToFileURL(packLoaderPath).href);
+const { resolveKnowledgePack } = await import(pathToFileURL(packLoaderPath).href);
 
-const [packResult, extractorResult] = await Promise.all([
-  resolveKnowledgePack(binding.id, binding.version, binding.from, bindingPath),
-  loadExtractionPack(binding.id, binding.version, binding.from, bindingPath),
-]);
+const packResult = await resolveKnowledgePack(binding.id, binding.version, binding.from, bindingPath);
+// The binding "from" value is a bare package specifier, resolved from the
+// temp install's node_modules exactly as the pack loader resolves it.
+const packModule = await import(binding.from);
 
 process.stdout.write(JSON.stringify({
   packOk: packResult.ok,
   packErrors: packResult.ok ? null : packResult.errors,
-  extractorOk: extractorResult.ok,
-  extractorErrors: extractorResult.ok ? null : extractorResult.errors,
+  captureExports: [
+    "captureFromTurn",
+    "previewStructuredCapture",
+    "materialize",
+  ].filter((name) => typeof packModule[name] === "function"),
+  hasExtractCandidates: typeof packModule.engramCoachPack?.extractCandidates === "function",
   viewIds: packResult.ok ? packResult.value.views.map((view) => view.id) : [],
   audienceIds: packResult.ok ? packResult.value.audiences.map((audience) => audience.id) : [],
   deliveryIds: packResult.ok ? packResult.value.deliveries.map((delivery) => delivery.id) : [],
@@ -162,7 +169,15 @@ describe("packed module", () => {
       const result = JSON.parse(stdout) as ResolverResult;
 
       expect(result.packOk, JSON.stringify(result.packErrors)).toBe(true);
-      expect(result.extractorOk, JSON.stringify(result.extractorErrors)).toBe(true);
+      // The three binding-selected capture functions the OMP adapter resolves
+      // by name must survive packaging.
+      expect(result.captureExports).toEqual([
+        "captureFromTurn",
+        "previewStructuredCapture",
+        "materialize",
+      ]);
+      // Ambient capture is LLM-only: no deterministic extractor facet ships.
+      expect(result.hasExtractCandidates).toBe(false);
       expect(result.viewIds).toContain("athlete-profile");
       expect(result.audienceIds).toContain("self-coach");
       expect(result.deliveryIds).toContain("profile-markdown");

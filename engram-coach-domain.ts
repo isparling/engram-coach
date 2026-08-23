@@ -184,12 +184,17 @@ export type EngramCoachDetails = {
   /** Turn index within the session for provenance. */
   turnIndex: number;
 
-  /** Confidence: "high" when LLM was used, "low" for deterministic fallback. */
+  /**
+   * Confidence in the extraction. Ambient LLM candidates are "low" until a
+   * human reviews them; explicitly captured, athlete-approved records are
+   * "high".
+   */
   extractionConfidence: "high" | "low";
 };
 
 // ---------------------------------------------------------------------------
-// Coaching topic hints — expanded set for deterministic fallback extraction.
+// Coaching topic hints — the vocabulary skills and ambient prompts use to tag
+// scope topics.
 // ---------------------------------------------------------------------------
 
 export const COACHING_TOPIC_HINTS = [
