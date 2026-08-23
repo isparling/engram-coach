@@ -10,19 +10,40 @@ Run silently. No user input except where step 6 applies.
 
 ## 1. Resolve paths _(all skills)_
 
-- **Plugin root** — `${CLAUDE_PLUGIN_ROOT}` (set by Claude Code). All bundled
-  assets resolve from here: `personas/`, `templates/`, `knowledge/`, `analyses/`,
-  `analysis-tools/`, and `shared/`.
-- **Config path** — the first of these that exists, hereafter `{config_path}`:
-  `$ENGRAM_COACH_CONFIG` → `./.engram-coach/config.json` (project-level, in the
-  athlete repo you are working in) → `~/.claude/engram-coach/config.json`.
+### Plugin root
+
+Resolve `{plugin_root}` before reading any bundled asset:
+
+1. Claude Code: use the absolute `${CLAUDE_PLUGIN_ROOT}` value.
+2. OMP: take the absolute path of this skill's loaded `SKILL.md` and remove
+   `/skills/{skill-name}/SKILL.md`.
+
+The result must contain `shared/setup.md`, `personas/`, `templates/`,
+`knowledge/`, `analyses/`, `analysis-tools/`, and `skills/`. Resolve every
+bundled path beneath this absolute root.
+
+### Config path
+
+Resolve `{config_path}` from the first existing candidate, in this exact order:
+
+1. If `ENGRAM_COACH_CONFIG` is non-empty, expand it to an absolute path and use
+   that candidate.
+2. Resolve `{cwd}/.engram-coach/config.json`, where `{cwd}` is the absolute OMP
+   or Claude project working directory.
+3. Resolve `{home}/.claude/engram-coach/config.json`, where `{home}` is the
+   absolute user home directory.
+
+For each candidate, issue Read with the **complete absolute path**. The config
+Read path always ends in `.engram-coach/config.json` or is the explicit
+`ENGRAM_COACH_CONFIG` value; `config.json` by itself is not a resolved path.
 
 ## 2. Read config _(all skills)_
 
-Read `{config_path}`. If absent, stop and output:
+Read the resolved absolute `{config_path}`. If no candidate exists, stop and
+output:
 
-> "config.json not found. Run `engram-coach:intake` to create it, or copy
-> `${CLAUDE_PLUGIN_ROOT}/config.json.example` to `./.engram-coach/config.json`
+> "config.json not found. Run the `intake` skill to create it, or copy
+> `{plugin_root}/config.json.example` to `{cwd}/.engram-coach/config.json`
 > and configure your paths. See SETUP.md."
 
 ## 3. Resolve active profile _(all skills)_
@@ -60,13 +81,13 @@ Store the answer for the duration of the session.
 
 ## 7. Load the persona _(all skills)_
 
-Load `${CLAUDE_PLUGIN_ROOT}/personas/{active_persona}.json` and
-`${CLAUDE_PLUGIN_ROOT}/personas/{active_persona}-monitoring.md` as reasoning
+Load `{plugin_root}/personas/{active_persona}.json` and
+`{plugin_root}/personas/{active_persona}-monitoring.md` as reasoning
 context. If either is missing, stop and output:
 
 > "Persona '{active_persona}' not found. Expected:
->   ${CLAUDE_PLUGIN_ROOT}/personas/{active_persona}.json
->   ${CLAUDE_PLUGIN_ROOT}/personas/{active_persona}-monitoring.md
+>   {plugin_root}/personas/{active_persona}.json
+>   {plugin_root}/personas/{active_persona}-monitoring.md
 > Check config.json active_persona value."
 
 ## 8. Load the athlete profile _(all skills)_
