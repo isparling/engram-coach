@@ -12,6 +12,9 @@
   "omp": {},
   "files": [
     "engram-coach-domain.ts",
+    "engram-coach-capture-types.ts",
+    "engram-coach-config.ts",
+    "engram-coach-keys.ts",
     "engram-coach-extractor.ts",
     "engram-coach-reconciliation.ts",
     "engram-coach-presentation.ts",

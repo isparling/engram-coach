@@ -44,7 +44,7 @@ export const engramCoachPack: KnowledgePack & KnowledgeExtractor & PresentationP
 
   // KnowledgePack facets
   validateEnvelope,
-  relatedQuery,
+  selectRelatedRecords: (envelope) => ({ mode: "search", query: relatedQuery(envelope) }),
   reconcile,
 
   // KnowledgeExtractor facets

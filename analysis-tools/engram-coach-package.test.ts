@@ -170,5 +170,7 @@ describe("packed module", () => {
       if (tempDir !== undefined) await rm(tempDir, { recursive: true, force: true });
       if (packDir !== undefined) await rm(packDir, { recursive: true, force: true });
     }
-  });
+  // Real `npm pack` plus a real consumer install runs ~4s alone and longer
+  // under full-suite contention; the 5s default made this gate flaky.
+  }, 120_000);
 });
