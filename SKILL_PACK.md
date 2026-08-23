@@ -10,7 +10,7 @@ engram-coach is a document-driven endurance-coaching plugin. Skills use athlete-
 - `personas/` — generic coaching-policy definitions.
 - `templates/` — Markdown templates for planning and review artifacts.
 - `analyses/` — stream-analysis catalog and data requirements.
-- `tools/` — deterministic TypeScript analysis utilities.
+- `analysis-tools/` — deterministic TypeScript analysis utilities.
 - `shared/` — common setup and retrieval instructions.
 
 ## Personas

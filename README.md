@@ -110,8 +110,8 @@ This repository ships no athlete records, medical information, real event data, 
 Install tool dependencies and run the public test suite:
 
 ```bash
-npm install --prefix tools
-npm test --prefix tools
+npm install --prefix analysis-tools
+npm test --prefix analysis-tools
 ```
 
 For the lactate package:

@@ -35,8 +35,8 @@ Skills generate Markdown records in the configured coaching workspace, including
 Run the tools suite with:
 
 ```bash
-npm install --prefix tools
-npm test --prefix tools
+npm install --prefix analysis-tools
+npm test --prefix analysis-tools
 ```
 
 Build the lactate package with:

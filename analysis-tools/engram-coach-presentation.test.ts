@@ -3,7 +3,7 @@
  * audience authorization and the deterministic `athlete-profile` view
  * projection.
  *
- * See `tools/pack-domain.test.ts` for the domain model, extractor,
+ * See `analysis-tools/pack-domain.test.ts` for the domain model, extractor,
  * validation, and reconciliation test suites.
  */
 

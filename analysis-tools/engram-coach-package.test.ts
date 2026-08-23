@@ -39,7 +39,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const here = dirname(fileURLToPath(import.meta.url)); // tools/
+const here = dirname(fileURLToPath(import.meta.url)); // analysis-tools/
 const repoRoot = resolve(here, ".."); // engram-coach repo root
 const harnessDir = resolve(repoRoot, "../engram/harness");
 

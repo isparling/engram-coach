@@ -222,11 +222,11 @@ committed. Whether you need this step depends on how you installed:
 
 | Install source | `npm install` needed? |
 |---|---|
-| GitHub / remote marketplace | **Yes, after every install and update.** Only tracked files are cloned, so `tools/node_modules` is absent. |
-| Local path marketplace | **Usually no.** A local install copies the working directory as-is, including `tools/node_modules`. Run it only if the directory is missing or the lockfile changed. |
+| GitHub / remote marketplace | **Yes, after every install and update.** Only tracked files are cloned, so `analysis-tools/node_modules` is absent. |
+| Local path marketplace | **Usually no.** A local install copies the working directory as-is, including `analysis-tools/node_modules`. Run it only if the directory is missing or the lockfile changed. |
 
 ```bash
-cd "$(ls -d ~/.claude/plugins/cache/*/engram-coach/*/ | tail -1)tools" && npm install
+cd "$(ls -d ~/.claude/plugins/cache/*/engram-coach/*/ | tail -1)analysis-tools" && npm install
 ```
 
 Skills degrade gracefully if this is skipped — each affected analysis annotates

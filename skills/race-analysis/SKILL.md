@@ -89,7 +89,7 @@ Run two CLIs and capture their JSON output. NO raw stream data enters LLM contex
 2. **Run stream-analyze:**
 
    ```bash
-   cd ${CLAUDE_PLUGIN_ROOT}/tools && npx tsx stream-analyze.ts \
+   cd ${CLAUDE_PLUGIN_ROOT}/analysis-tools && npx tsx stream-analyze.ts \
      --activity-id={race_id} \
      --analyses=fade,time_in_zone,np_distribution,decoupling,hr_recovery,interval_cv,sim_compare,lap_trends \
      --ftp-override={ftp} \
@@ -100,7 +100,7 @@ Run two CLIs and capture their JSON output. NO raw stream data enters LLM contex
 3. **Run race-context:**
 
    ```bash
-   cd ${CLAUDE_PLUGIN_ROOT}/tools && npx tsx race-context.ts --activity-id={race_id}
+   cd ${CLAUDE_PLUGIN_ROOT}/analysis-tools && npx tsx race-context.ts --activity-id={race_id}
    ```
 
 4. **Assemble bundle:** parse both JSON outputs. For any analysis present in `output.errors`, drop it from the bundle and note the error for the draft phase.

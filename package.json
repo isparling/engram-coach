@@ -9,6 +9,7 @@
       "import": "./engram-coach-pack.ts"
     }
   },
+  "omp": {},
   "files": [
     "engram-coach-domain.ts",
     "engram-coach-extractor.ts",
@@ -16,6 +17,15 @@
     "engram-coach-presentation.ts",
     "engram-coach-pack.ts",
     "capture-handler.ts",
+    "skills/",
+    "shared/",
+    "analyses/",
+    "personas/",
+    "templates/",
+    "analysis-tools/",
+    "config.json.example",
+    "SETUP.md",
+    "SKILL_PACK.md",
     "README.md"
   ],
   "peerDependencies": {
@@ -30,7 +40,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "npm test --prefix tools",
+    "test": "npm test --prefix analysis-tools",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pack:local": "npm pack --json"
   }

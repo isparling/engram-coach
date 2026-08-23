@@ -12,7 +12,7 @@ Run silently. No user input except where step 6 applies.
 
 - **Plugin root** — `${CLAUDE_PLUGIN_ROOT}` (set by Claude Code). All bundled
   assets resolve from here: `personas/`, `templates/`, `knowledge/`, `analyses/`,
-  `tools/`, and `shared/`.
+  `analysis-tools/`, and `shared/`.
 - **Config path** — the first of these that exists, hereafter `{config_path}`:
   `$ENGRAM_COACH_CONFIG` → `./.engram-coach/config.json` (project-level, in the
   athlete repo you are working in) → `~/.claude/engram-coach/config.json`.

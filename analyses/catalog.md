@@ -220,7 +220,7 @@ Each analysis defines:
 **Description:** Multi-week HRV trend analysis with personal baseline computation. Pulls 60+ days of wellness history and classifies today's reading against a dual-window rolling baseline (14-day short, 60-day long) using z-score position, percentile rank, linear regression slope, and historical-analog lookup (prior readings at or near today's level and how quickly they rebounded). Designed to replace absolute-value thresholds with athlete-calibrated readiness signals.
 
 **Data Source:**
-- `hrv-trend` CLI tool (`npx tsx tools/hrv-trend.ts --config ...`) — fetches wellness history via Intervals.icu REST API, computes all statistics in-process, returns compact JSON. No raw wellness data enters LLM context.
+- `hrv-trend` CLI tool (`npx tsx analysis-tools/hrv-trend.ts --config ...`) — fetches wellness history via Intervals.icu REST API, computes all statistics in-process, returns compact JSON. No raw wellness data enters LLM context.
 
 **Required Data:**
 - Wellness data with `hrv_rmssd` (or `hrv_sdnn`) entries

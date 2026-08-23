@@ -72,10 +72,10 @@ Read and search silently before asking anything:
    | `power_curve_trend` | No | `get_power_curves` MCP |
    | `hr_at_power_trend` | No | MCP tools (compact endpoints) |
    | `resting_hr_trend` | No | `get_wellness` MCP |
-   | `hrv_trend` | No | `npx tsx ${CLAUDE_PLUGIN_ROOT}/tools/hrv-trend.ts --config {config_path} --date {target_date}` |
+   | `hrv_trend` | No | `npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-analysis-tools/hrv-trend.ts --config {config_path} --date {target_date}` |
 
    **`hrv_trend` — dedicated CLI tool:** When `hrv_trend` is enabled in the persona:
-   1. Run: `npx tsx ${CLAUDE_PLUGIN_ROOT}/tools/hrv-trend.ts --config {config_path} --date {today_YYYY-MM-DD}`. Pass persona-configured windows if present: `--short-window {short_window_days} --long-window {long_window_days} --metric {metric}`.
+   1. Run: `npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-analysis-tools/hrv-trend.ts --config {config_path} --date {today_YYYY-MM-DD}`. Pass persona-configured windows if present: `--short-window {short_window_days} --long-window {long_window_days} --metric {metric}`.
    2. Parse the JSON output. If `classification.label` is `amber-red` or `red`, surface it prominently in the Orient announcement with the full `reasoning` string.
    3. Store the complete output object as `hrv_trend_result` for use in Phase 3 — Synthesize and Phase 4 — Propose.
    4. If the tool exits non-zero or the output is malformed, annotate: "[hrv_trend unavailable — {error}. Proceeding without.]" and continue.
@@ -85,7 +85,7 @@ Read and search silently before asking anything:
    1. Read `intervals_icu` config from `{config_path}`. If the `intervals_icu` block is missing or incomplete, skip all stream-dependent analyses and annotate: "[Stream analyses unavailable — intervals_icu config not found in config.json. See SETUP.md.]"
    2. Run the CLI tool:
       ```bash
-      npx tsx ${CLAUDE_PLUGIN_ROOT}/tools/stream-analyze.ts \
+      npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-analysis-tools/stream-analyze.ts \
         --activity-id {activity_id} \
         --analyses {comma_separated_keys} \
         --config {config_path}
@@ -102,7 +102,7 @@ Read and search silently before asking anything:
 2c. **TSB projection** — after retrieving the completed workout's TSS (from step 2), call the TSB prediction tool:
 
    ```bash
-   npx tsx ${CLAUDE_PLUGIN_ROOT}/tools/tsb-predict.ts --ctl {current_ctl} --atl {current_atl} --tss {tss_sequence}
+   npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-analysis-tools/tsb-predict.ts --ctl {current_ctl} --atl {current_atl} --tss {tss_sequence}
    ```
 
    Where `{tss_sequence}` is a comma-separated list of estimated daily TSS values for the upcoming days, derived from:
@@ -115,7 +115,7 @@ Read and search silently before asking anything:
    - Multi-day trajectory through the end of the current week
    - Flag any day where projected TSB crosses a persona threshold (push/moderate/easy/rest)
 
-   If the tool is not installed (npm dependencies missing in tools/), skip this step and annotate: "[TSB projection unavailable — run `npm install` in tools/.]"
+   If the tool is not installed (npm dependencies missing in analysis-tools/), skip this step and annotate: "[TSB projection unavailable — run `npm install` in analysis-tools/.]"
 
 3. **Training block context** — determine current phase (base/build/peak/recovery), position within the week, and upcoming workouts that may be affected by today's adaptation. After identifying the active block from step 1, resolve the block name to a template file name by stripping any date prefix and normalizing to lowercase with hyphens (e.g., "Build 1" → "build-1", "Base" → "base", "Race Specificity" → "race-specificity"). Then read `${CLAUDE_PLUGIN_ROOT}/templates/{block-name}.md` as additional context. This file describes the block's intent, session patterns, weekly structure, and success signals. If the file is missing: continue without it and annotate in the Orient summary: "[Block template {block-name}.md not found — proceeding without block template context.]"
 
