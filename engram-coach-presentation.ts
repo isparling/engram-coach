@@ -55,6 +55,13 @@ function hasClinicalSignal(record: KnowledgeRecord): boolean {
   if (!Array.isArray(value)) return false;
   return value.some((signal) => typeof signal === "string" && CLINICIAN_TRAINING_SIGNALS[signal] === true);
 }
+function isTemporallyEffective(record: KnowledgeRecord): boolean {
+  const value = record.details.effectiveAt;
+  if (typeof value !== "string") return true;
+  const time = Date.parse(value);
+  return Number.isNaN(time) ? true : time <= Date.now();
+}
+
 
 // ---------------------------------------------------------------------------
 // Retrieval policy — scope every query and profile enumeration to active
@@ -67,7 +74,9 @@ const retrievalPolicy: PresentationPack["retrievalPolicy"] = {
   classifySource: () => "engram-coach",
   relevanceThreshold: null,
   isEligible: (record) =>
-    record.status === "active" && record.pack.id === engramCoachPackId,
+    record.status === "active"
+    && record.pack.id === engramCoachPackId
+    && isTemporallyEffective(record),
   includePresentations: false,
 };
 

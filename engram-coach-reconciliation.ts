@@ -15,11 +15,18 @@
  */
 
 import type {
+  JsonObject,
+  JsonValue,
+  KnowledgeDisposition,
   KnowledgeEnvelope,
+  KnowledgeError,
+  KnowledgeRelationships,
   KnowledgeResult,
+  PackMutation,
   PackReconciliation,
   PackReconcileInput,
   KnowledgeRecord,
+  RelatedRecordSelection,
 } from "@isparling/engram-harness/knowledge-types";
 import {
   ENGRAM_COACH_ENTITY_TYPES,
@@ -168,6 +175,8 @@ function entityTypeFromRecord(record: KnowledgeRecord): EngramCoachEntityType | 
 export function reconcile(
   input: PackReconcileInput,
 ): KnowledgeResult<PackReconciliation> {
+  if (input.candidate.details["captureChannel"] === "explicit") return reconcileExplicit(input);
+
   const candidate = input.candidate;
   const related = input.related;
   const candidateDetails = candidate.details as Partial<EngramCoachDetails> | undefined;
@@ -296,10 +305,287 @@ export function reconcile(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Explicit capture channel — exact selection and per-item reconciliation
+// ---------------------------------------------------------------------------
+
+const engramCoachPackId = "engram-coach";
+
+type ExplicitItem = {
+  sourceId: string;
+  recordId: string;
+  role: string;
+  entityType: string;
+  entityKey: string | null;
+  effectiveAt: string;
+  statement: string;
+  value: JsonObject;
+  artifact: JsonObject;
+  actionTargets?: JsonValue;
+  sourceDocument?: JsonValue;
+};
+
+function isJsonObject(value: JsonValue): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asString(value: JsonValue | undefined): string | null {
+  return typeof value === "string" ? value : null;
+}
+
 /**
- * Build a query string from an envelope for finding related records.
+ * Narrow the aggregate candidate's `details.items` array back into typed
+ * items. The array was built by `buildAggregateCandidate`, so every entry
+ * already satisfies the shape; anything else fails closed.
  */
-export function relatedQuery(envelope: KnowledgeEnvelope): string {
+function explicitItems(envelope: KnowledgeEnvelope): ExplicitItem[] | null {
+  const rawItems = envelope.details["items"];
+  if (!Array.isArray(rawItems)) return null;
+  const items: ExplicitItem[] = [];
+  for (const raw of rawItems) {
+    if (!isJsonObject(raw)) return null;
+    const artifact = raw["artifact"];
+    const value = raw["value"];
+    const sourceId = asString(raw["sourceId"]);
+    const recordId = asString(raw["recordId"]);
+    const role = asString(raw["role"]);
+    const entityType = asString(raw["entityType"]);
+    const statement = asString(raw["statement"]);
+    const effectiveAt = asString(raw["effectiveAt"]);
+    if (sourceId === null || recordId === null || role === null || entityType === null || statement === null || effectiveAt === null || !isJsonObject(artifact) || !isJsonObject(value)) {
+      return null;
+    }
+    items.push({
+      sourceId,
+      recordId,
+      role,
+      entityType,
+      entityKey: asString(raw["entityKey"]),
+      effectiveAt,
+      statement,
+      value,
+      artifact,
+      actionTargets: raw["actionTargets"],
+      sourceDocument: raw["sourceDocument"],
+    });
+  }
+  return items;
+}
+
+function validationError(code: string, message: string): KnowledgeError {
+  return { kind: "validation", code, message };
+}
+
+function activeByKey(records: readonly KnowledgeRecord[]): Map<string, KnowledgeRecord[]> {
+  const byKey = new Map<string, KnowledgeRecord[]>();
+  for (const record of records) {
+    if (record.status !== "active") continue;
+    const key = asString(record.details["entityKey"]);
+    if (key === null) continue;
+    const existing = byKey.get(key);
+    if (existing === undefined) byKey.set(key, [record]);
+    else existing.push(record);
+  }
+  return byKey;
+}
+
+function canonicalValue(value: JsonObject): string {
+  return JSON.stringify(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, item]),
+  );
+}
+
+function effectiveTime(value: string): number {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+}
+
+/** True when the candidate value keeps every current entry identical AND adds at least one new entry. */
+function isStrictSuperset(currentValue: JsonObject, candidateValue: JsonObject): boolean {
+  for (const [key, item] of Object.entries(currentValue)) {
+    if (!(key in candidateValue) || canonicalValue({ [key]: candidateValue[key] }) !== canonicalValue({ [key]: item })) return false;
+  }
+  return Object.keys(candidateValue).length > Object.keys(currentValue).length;
+}
+/** Fill every relationship edge; a partial input leaves unused edges empty. */
+function completeRelationships(partial: Partial<KnowledgeRelationships>): KnowledgeRelationships {
+  return { supports: [], contradicts: [], refines: [], supersedes: [], ...partial };
+}
+
+function createdExplicitRecord(
+  candidate: KnowledgeEnvelope,
+  item: ExplicitItem,
+  disposition: KnowledgeDisposition,
+  relatedEdges: Partial<KnowledgeRelationships>,
+  relatedId: string,
+): KnowledgeRecord {
+  return {
+    schemaVersion: 0,
+    id: item.recordId,
+    kind: item.role === "event" ? "evidence" : item.role === "report-claim" ? "claim" : "decision",
+    status: "active",
+    statement: item.statement,
+    details: {
+      recordRole: item.role,
+      entityType: item.entityType,
+      entityKey: item.entityKey,
+      effectiveAt: item.effectiveAt,
+      sourceId: item.sourceId,
+      value: item.value,
+      artifact: item.artifact,
+      captureChannel: "explicit",
+    },
+    scope: candidate.scope,
+    pack: candidate.pack,
+    sources: [{ type: "engram-coach-capture", ref: item.sourceId }],
+    session: candidate.session,
+    submittedAt: candidate.submittedAt,
+    disposition,
+    relationships: completeRelationships(relatedEdges),
+    history: [{ event: "created", relatedId, submittedAt: candidate.submittedAt }],
+  };
+}
+
+function retiredCopy(current: KnowledgeRecord, retiredBy: string, submittedAt: string): KnowledgeRecord {
+  // Preserves sources, session, scope, relationships, and history verbatim;
+  // adds ONLY the status transition and one retirement history entry.
+  return {
+    ...current,
+    status: "retired",
+    history: [...current.history, { event: "retired", relatedId: retiredBy, submittedAt }],
+  };
+}
+
+/**
+ * Reconcile an explicit aggregate candidate against exact-key related
+ * records using the design's rules 1-7:
+ *   1. events append, never updating another record;
+ *   2. no active exact key → create active state/report claim;
+ *   3. equal canonical value → no mutation (state) or support edge (claim);
+ *   4. conflict-free strict superset → refine + retire current;
+ *   5. later effective time → supersede + retire current;
+ *   6. same/earlier time with conflicting values → validation error;
+ *   7. more than one active exact-key record → ambiguous_state error.
+ */
+function reconcileExplicit(input: PackReconcileInput): KnowledgeResult<PackReconciliation> {
+  const items = explicitItems(input.candidate);
+  if (items === null) {
+    return { ok: false, errors: [validationError("explicit_items_invalid", "explicit candidate details.items is missing or malformed")] };
+  }
+  const errors: KnowledgeError[] = [];
+  const mutations: PackMutation[] = [];
+  const actives = activeByKey(input.related);
+  for (const item of items) {
+    if (item.role !== "state" && item.role !== "event" && item.role !== "report-claim") {
+      errors.push(validationError("explicit_role_invalid", `item ${item.sourceId} has unknown recordRole ${item.role}`));
+      continue;
+    }
+    if (item.role === "event") {
+      mutations.push({
+        action: "create",
+        record: createdExplicitRecord(input.candidate, item, "new", {}, item.recordId),
+      });
+      continue;
+    }
+    const key = item.entityKey;
+    if (key === null) {
+      errors.push(validationError("explicit_key_unbound", `item ${item.sourceId} has no bound canonical entity key`));
+      continue;
+    }
+    const current = actives.get(key) ?? [];
+    if (current.length > 1) {
+      errors.push(validationError("ambiguous_state", `${current.length} active records share entity key ${key}; approval blocked pending correction`));
+      continue;
+    }
+    const prior = current[0];
+    if (prior === undefined) {
+      mutations.push({
+        action: "create",
+        record: createdExplicitRecord(input.candidate, item, "new", {}, item.recordId),
+      });
+      continue;
+    }
+    const priorValue = prior.details["value"];
+    if (!isJsonObject(priorValue)) {
+      errors.push(validationError("explicit_value_invalid", `active record ${prior.id} has a non-object details.value`));
+      continue;
+    }
+    if (item.role === "report-claim") {
+      mutations.push({
+        action: "create",
+        record: createdExplicitRecord(input.candidate, item, "support", { supports: [prior.id] }, prior.id),
+      });
+      continue;
+    }
+    if (canonicalValue(item.value) === canonicalValue(priorValue) && item.effectiveAt === asString(prior.details["effectiveAt"])) {
+      continue;
+    }
+    if (isStrictSuperset(priorValue, item.value)) {
+      mutations.push({
+        action: "create",
+        record: createdExplicitRecord(input.candidate, item, "refine", { refines: [prior.id] }, prior.id),
+      });
+      mutations.push({ action: "update", record: retiredCopy(prior, item.recordId, input.candidate.submittedAt) });
+      continue;
+    }
+    if (effectiveTime(item.effectiveAt) > effectiveTime(asString(prior.details["effectiveAt"]) ?? "")) {
+      mutations.push({
+        action: "create",
+        record: createdExplicitRecord(input.candidate, item, "supersede", { supersedes: [prior.id] }, prior.id),
+      });
+      mutations.push({ action: "update", record: retiredCopy(prior, item.recordId, input.candidate.submittedAt) });
+      continue;
+    }
+    errors.push(validationError(
+      "state_conflict",
+      `item ${item.sourceId} conflicts with active record ${prior.id} at the same or earlier effective time; approval blocked pending correction`,
+    ));
+  }
+  if (errors.length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    value: {
+      disposition: "new",
+      summary: `explicit capture planned ${mutations.filter((mutation) => mutation.action === "create").length} record(s)`,
+      mutations,
+    },
+  };
+}
+
+/**
+ * Related-record selection for the coaching pack.
+ *
+ * Explicit aggregate candidates (`details.captureChannel === "explicit"`)
+ * use EXACT mode: records from this pack whose `details.entityKey` is one
+ * of the candidate's bound keys — semantic search never selects identity.
+ * Legacy generic envelopes keep the coaching search query until ambient
+ * review promotion uses structured records.
+ */
+export function selectRelatedRecords(envelope: KnowledgeEnvelope): RelatedRecordSelection {
+  if (envelope.details["captureChannel"] === "explicit") {
+    const items = explicitItems(envelope) ?? [];
+    const keys = [...new Set(items.map((item) => item.entityKey).filter((key): key is string => key !== null))];
+    const keySet: Record<string, true> = {};
+    for (const key of keys) keySet[key] = true;
+    return {
+      mode: "exact",
+      description: keys.length > 0 ? `exact entity keys: ${keys.join(", ")}` : "explicit capture without bound entity keys",
+      matches: (record) =>
+        record.pack.id === engramCoachPackId
+        && typeof record.details["entityKey"] === "string"
+        && keySet[record.details["entityKey"] as string] === true,
+    };
+  }
+  return { mode: "search", query: coachingQuery(envelope) };
+}
+
+/**
+ * Build a query string from an envelope for finding related records
+ * (legacy generic envelopes only).
+ */
+function coachingQuery(envelope: KnowledgeEnvelope): string {
   const details = envelope.details as Partial<EngramCoachDetails> | undefined;
   const entityType = details?.entityType;
   const persona = details?.persona;

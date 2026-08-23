@@ -19,7 +19,7 @@ import type {
   HostCaptureApply,
   HostCapturePreview,
 } from "@isparling/engram-harness/capture-types";
-import type { JsonObject, KnowledgeError } from "@isparling/engram-harness/knowledge-types";
+import type { JsonObject, KnowledgeEnvelope, KnowledgeError } from "@isparling/engram-harness/knowledge-types";
 import type { EngramCoachSkill } from "./engram-coach-domain.ts";
 
 /** Current schema version for every structured capture payload. */
@@ -96,7 +96,38 @@ export function makeEmptyChangeSet(source: StructuredCaptureSource): StructuredC
  * it would commit; a blocked preview carries validation errors and never
  * reaches Phase 4 presentation.
  */
-export type CapturePreview = HostCapturePreview;
+export type CapturePreview = ReadyCapturePreview | BlockedCapturePreview;
+
+/** One per-entity row of the ready preview, in plan order. */
+export type CaptureChangeView = {
+  entityKey: string | null;
+  recordRole: RecordRole;
+  classification: "new" | "no-change" | "refine" | "supersede" | "append" | "support";
+  creates: string[];
+  retires: string[];
+};
+
+/** Ready preview shape emitted by `previewStructuredCapture`. */
+export type ReadyCapturePreview = {
+  schemaVersion: 0;
+  status: "ready";
+  planHash: string;
+  /**
+   * The private aggregate candidate. Retained by the extension to bind the
+   * approved hash to the exact submitted envelope; NEVER rendered to the
+   * model — extension output shows only `planHash`, `changes`, `artifacts`.
+   */
+  candidate: KnowledgeEnvelope;
+  changes: CaptureChangeView[];
+  artifacts: string[];
+};
+
+/** Blocked preview shape: pack or host errors, verbatim, no proposal. */
+export type BlockedCapturePreview = {
+  schemaVersion: 0;
+  status: "blocked";
+  errors: KnowledgeError[];
+};
 
 // ---------------------------------------------------------------------------
 // Apply — the committed plan handed to materialization

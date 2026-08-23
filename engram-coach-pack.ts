@@ -30,9 +30,11 @@ import { engramCoachPresentation } from "./engram-coach-presentation.ts";
 import {
   validateEnvelope,
   reconcile,
-  relatedQuery,
+  selectRelatedRecords,
 } from "./engram-coach-reconciliation.ts";
 export { captureFromTurn } from "./capture-handler.ts";
+export { previewStructuredCapture } from "./engram-coach-structured-capture.ts";
+export { materialize } from "./engram-coach-materialization.ts";
 
 export const engramCoachPackId = "engram-coach";
 export const engramCoachPackVersion = "0.1.0";
@@ -44,7 +46,7 @@ export const engramCoachPack: KnowledgePack & KnowledgeExtractor & PresentationP
 
   // KnowledgePack facets
   validateEnvelope,
-  selectRelatedRecords: (envelope) => ({ mode: "search", query: relatedQuery(envelope) }),
+  selectRelatedRecords,
   reconcile,
 
   // KnowledgeExtractor facets

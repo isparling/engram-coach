@@ -604,11 +604,11 @@ describe("reconcile", () => {
 });
 
 // ---------------------------------------------------------------------------
-// relatedQuery
+// selectRelatedRecords
 // ---------------------------------------------------------------------------
 
-describe("relatedQuery", () => {
-  it("builds query from entity type and persona", async () => {
+describe("selectRelatedRecords", () => {
+  it("uses search mode with a coaching query for generic envelopes", async () => {
     const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = makeEnvelope({
       details: {
@@ -617,34 +617,67 @@ describe("relatedQuery", () => {
         trainingPhase: "build-1",
       },
     });
-    const query = mod.relatedQuery(envelope as never);
-    expect(query).toContain("lactate-test");
-    expect(query).toContain("persona:volume");
-    expect(query).toContain("phase:build-1");
+    const selection = mod.selectRelatedRecords(envelope as never);
+    expect(selection.mode).toBe("search");
+    if (selection.mode !== "search") return;
+    expect(selection.query).toContain("lactate-test");
+    expect(selection.query).toContain("persona:volume");
+    expect(selection.query).toContain("phase:build-1");
   });
 
-  it("falls back to statement when no details fields", async () => {
+  it("falls back to the statement when no details fields exist", async () => {
     const mod = await import("../engram-coach-reconciliation.ts");
     const envelope = makeEnvelope({
       details: {},
       statement: "power fade during threshold intervals",
     });
-    const query = mod.relatedQuery(envelope as never);
-    expect(query).toContain("power fade");
+    const selection = mod.selectRelatedRecords(envelope as never);
+    expect(selection.mode).toBe("search");
+    if (selection.mode !== "search") return;
+    expect(selection.query).toContain("power fade");
   });
 
-  it("includes training signals in query", async () => {
+  it("uses exact mode keyed by bound entity keys for explicit candidates", async () => {
     const mod = await import("../engram-coach-reconciliation.ts");
+    // Items must carry the full normalized shape `explicitItems` narrows
+    // (the same entries `buildAggregateCandidate` writes); anything else
+    // fails closed with no bound keys.
+    const stateItem = {
+      sourceId: "omp-session:0:state:0",
+      recordId: "coach-000000000000000000000001",
+      role: "state",
+      entityType: "prescription",
+      entityKey: "prescription:arc-a:workout-7f8c",
+      effectiveAt: "2026-08-25",
+      statement: "Thursday changes from 4x8 at 295 W to 3x8 at 285 W",
+      value: { intervals: 3, reps: 8, watts: 285 },
+      artifact: { kind: "prescription", relativePath: "prescriptions/arc-a.yaml" },
+      actionTargets: [],
+      sourceDocument: null,
+    };
+    const eventItem = { ...stateItem, sourceId: "omp-session:0:event:0", recordId: "coach-000000000000000000000002", role: "event", entityType: "consultation", entityKey: null };
     const envelope = makeEnvelope({
       details: {
-        entityType: "workout-adaptation",
-        trainingSignals: ["hrv", "tsb", "decoupling"],
+        captureChannel: "explicit",
+        items: [stateItem, eventItem],
       },
     });
-    const query = mod.relatedQuery(envelope as never);
-    expect(query).toContain("hrv");
-    expect(query).toContain("tsb");
-    expect(query).toContain("decoupling");
+    const selection = mod.selectRelatedRecords(envelope as never);
+    expect(selection.mode).toBe("exact");
+    if (selection.mode !== "exact") return;
+    expect(selection.description).toContain("prescription:arc-a:workout-7f8c");
+    expect(selection.matches(makeRecord({
+      pack: { id: "engram-coach", version: "0.1.0" },
+      details: { entityType: "prescription", entityKey: "prescription:arc-a:workout-7f8c" },
+    }))).toBe(true);
+    expect(selection.matches(makeRecord({
+      pack: { id: "engram-coach", version: "0.1.0" },
+      details: { entityType: "prescription", entityKey: "prescription:arc-b:workout-other" },
+    }))).toBe(false);
+    expect(selection.matches(makeRecord({
+      pack: { id: "other-pack", version: "1" },
+      details: { entityType: "prescription", entityKey: "prescription:arc-a:workout-7f8c" },
+    }))).toBe(false);
   });
 });
 
