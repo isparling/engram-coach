@@ -1,0 +1,10 @@
+# GENERATED FROM ENGRAM ACTIVE RECORDS. DO NOT EDIT DIRECTLY.
+block_name: base
+sessions:
+  - session_id: workout-base-1
+    week: 1
+    day: Wed
+    session_date: 2026-07-08
+    session_name: W1_Easy
+    total_duration_min: 90
+    effort_zone: Z1-Z2

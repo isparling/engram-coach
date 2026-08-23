@@ -15,6 +15,8 @@
     "engram-coach-capture-types.ts",
     "engram-coach-config.ts",
     "engram-coach-keys.ts",
+    "engram-coach-structured-capture.ts",
+    "engram-coach-materialization.ts",
     "engram-coach-extractor.ts",
     "engram-coach-reconciliation.ts",
     "engram-coach-presentation.ts",
@@ -46,5 +48,8 @@
     "test": "npm test --prefix analysis-tools",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pack:local": "npm pack --json"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
   }
 }
