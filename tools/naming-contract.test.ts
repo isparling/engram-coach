@@ -85,10 +85,12 @@ describe("naming contract", () => {
     expect(publicText).toContain("/skills/*/SKILL.md");
   });
 
-  it("documents the active binding registry prerequisite and required env var for direct OMP integration", async () => {
+  it("documents registered-space onboarding and durable OMP session selection", async () => {
     const { publicText } = await readPublicFiles();
 
     expect(publicText).toContain("ENGRAM_BINDING_REGISTRY");
-    expect(publicText).toMatch(/active[\s\S]{0,40}binding registry/);
+    expect(publicText).toContain("engram.space.json");
+    expect(publicText).toContain("ENGRAM_SPACE_ID");
+    expect(publicText).toMatch(/space[\s\S]{0,40}registered/);
   });
 });

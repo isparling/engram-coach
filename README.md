@@ -46,11 +46,11 @@ extensions:
 ```
 
 This does not include core Engram onboarding. The OMP extension resolves
-`engram-coach` by declaring it in the `installed_packs` of a space's binding
-inside an **existing, active Engram binding registry** — with a session-aware
-active space already registered and selected. That registry is an external
-prerequisite; this package neither creates nor configures one. Set one up
-through your own Engram deployment, then add the pack declaration:
+`engram-coach` through an **existing Engram binding registry** whose `training`
+space is already registered. The extension selects that space for each new OMP
+session from the nearest `engram.space.json`; `ENGRAM_SPACE_ID` overrides the
+manifest when needed. This package neither creates nor registers spaces. Set
+one up through your own Engram deployment, then add the pack declaration:
 
 ```json
 {

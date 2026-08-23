@@ -273,12 +273,13 @@ extensions:
   - ./node_modules/@isparling/engram-omp/omp-extension.ts
 ```
 
-The adapter does not read plugin state and does not select a pack itself: it
-resolves `engram-coach` by declaring it in the `installed_packs` of a space's
-binding inside an **existing, active Engram binding registry**. A complete,
-active binding registry — with a session-aware active space already
-registered and selected — is an external prerequisite; this package neither
-creates nor configures one. Set one up through your own Engram deployment.
+The adapter does not read coaching plugin state and does not choose a pack:
+the active binding's `installed_packs` declaration does that. A complete Engram
+binding registry with the space already registered is an external
+prerequisite; this package neither creates nor registers one. For each fresh
+OMP session, the extension selects the space declared by the nearest
+`engram.space.json`. Set `ENGRAM_SPACE_ID` only when that durable project
+default needs an explicit runtime override.
 The `installed_packs` declaration syntax itself (the fields below, and how a
 binding declares a pack) is documented in the
 [external pack interface](https://github.com/isparling/engram/blob/main/harness/docs/pack-interface.md).
@@ -304,6 +305,8 @@ entirely for the whole session.
 
 ```sh
 export ENGRAM_BINDING_REGISTRY=<absolute-path-to-registry.json>
+# Optional runtime override; omit to use the nearest engram.space.json.
+export ENGRAM_SPACE_ID=<space-id>
 ```
 
 At each awaited OMP `session_stop`, the extension imports the binding-selected
