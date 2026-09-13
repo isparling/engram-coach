@@ -1,0 +1,16 @@
+{
+  "schema_version": 0,
+  "source": { "skill": "race-analysis", "session_id": "omp-session", "turn_id": 7 },
+  "state_changes": [],
+  "events": [],
+  "report_claims": [
+    {
+      "entity_type": "race-conclusion",
+      "key_components": { "entity_type": "prescription", "arc_id": "arc-a", "session_id": "workout-7f8c" },
+      "effective_at": "2026-08-22",
+      "statement": "Race execution confirmed the reduced Thursday load: final-interval power held within 2% of target",
+      "source_document": "2026/races/2026-08-22-example-gravel-event/RACE_REPORT.md",
+      "details": { "conclusion": "reduced-load-correct", "final_interval_pct_of_target": 98 }
+    }
+  ]
+}

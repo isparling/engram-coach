@@ -71,6 +71,12 @@ the adapter disables knowledge capture entirely for the whole session. See
 [`SETUP.md`](SETUP.md#6-install-the-plugin) (Alternative: Direct OMP
 integration) for the full walkthrough.
 
+That binding's `write_roots` must also authorize your `coaching_docs_dir`
+and `prescriptions_dir`. Generated views are ordinary artifact writes: if
+those roots are unauthorized, captures still commit records but every
+regenerated view is reported stale with `root_not_writable` instead of being
+written.
+
 ### Verifying the direct OMP integration
 
 Bind the pack, start an OMP session, and complete one full agent turn — the
@@ -100,6 +106,55 @@ excluded from recall and profile presentation until explicitly promoted to
 ## Configuration
 
 Copy [`config.json.example`](config.json.example) to your local configuration path and replace every placeholder. Keep credentials and athlete records outside this repository. The example config defaults to the generic `conservative` persona.
+
+## Structured coaching capture
+
+Engram active records are the authoritative store for mutable coaching state
+and chronological events. Every record declares a role in
+`details.recordRole` — exactly one of `state` (one current value per canonical
+key; approved changes supersede), `event` (append-only history), or
+`report-claim` (a structured conclusion extracted from an approved report).
+Canonical entity keys are pack-derived:
+
+```text
+workout:<session-id>
+prescription:<arc-id>:<session-id>
+threshold:<sport>:lt1
+threshold:<sport>:lt2
+persona:<active-profile>
+monitoring:<concern-id>:<signal>
+```
+
+Workout identity is the durable `session_id`; dates, titles, week position,
+and contents are mutable attributes, never identity.
+
+During a turn, skills commit changes through two typed OMP tools:
+`engram_capture_preview({ change_set })` builds the mutation plan bound to an
+immutable plan hash, and `engram_capture_apply({ plan_hash })` commits exactly
+the hash the athlete approved. After apply, the pack regenerates deterministic
+compatibility views — prescription YAML, `consultations.md`, monitoring logs,
+doctor-prep summaries — each carrying a byte-exact warning header
+(`GENERATED FROM ENGRAM ACTIVE RECORDS. DO NOT EDIT DIRECTLY.`) and never
+edited directly. Long-form reports (`RACE_REPORT.md`, block `SUMMARY.md`,
+`SEASON_REVIEW.md`, methodology and arc-overview documents) remain canonical
+approved documents that skills author themselves.
+
+- A stale apply requires a fresh preview plus fresh approval; the old hash is
+  never accepted.
+- An `index-stale` status leaves committed records authoritative; only the qmd
+  index needs a later refresh.
+- A stale view after materialization failure is retried by re-calling
+  `engram_capture_apply` with the same committed hash in the same session —
+  this reruns only view regeneration, never record mutations.
+
+Ambient conversation capture runs separately through the pack's
+`captureFromTurn` handler using an explicit provider/model configured in
+`.engram-coach/config.json` (`capture.model`, overridable **model-only** via
+`ENGRAM_COACH_CAPTURE_MODEL`; absence of both is a configuration error).
+Extraction is LLM-only: failure emits a visible warning and creates no draft.
+Legacy workspaces migrate through the dry-run sequence documented in
+[SETUP.md](SETUP.md#7-knowledge-records-generated-views-and-migration):
+`scan` → `apply-baseline` → `emit-change-set` → `compare`.
 
 ## Privacy boundary
 

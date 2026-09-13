@@ -20,13 +20,13 @@ digraph adapt_plan {
     "Phase 3: Synthesize" [shape=box];
     "Phase 4: Propose" [shape=box];
     "Athlete approves?" [shape=diamond];
-    "Phase 5: Write" [shape=box];
+    "Phase 5: Apply" [shape=box];
 
     "Phase 1: Orient" -> "Phase 2: Gather";
     "Phase 2: Gather" -> "Phase 3: Synthesize";
     "Phase 3: Synthesize" -> "Phase 4: Propose";
     "Phase 4: Propose" -> "Athlete approves?";
-    "Athlete approves?" -> "Phase 5: Write" [label="yes"];
+    "Athlete approves?" -> "Phase 5: Apply" [label="yes"];
     "Athlete approves?" -> "Phase 4: Propose" [label="revise"];
 }
 ```
@@ -159,7 +159,48 @@ Reason aloud before proposing anything. Cover:
 
 This phase is **explanatory only**. No changes proposed yet. The athlete can push back on any part of the reasoning before you proceed.
 
+Alongside the reasoning above, assemble the typed domain input for this adaptation as a `StructuredChangeSet`. Emit **one state change** containing:
+
+- `entity_type: "prescription"` with `key_components` carrying `arc_id` and the durable `session_id` of the NEXT session being adapted
+- the effective date of the change
+- a concise statement of what changes and why
+- the COMPLETE updated prescription session value — never a prose patch. The value must carry every field of the session: `sessionId`, `sessionDate`, `sessionName`, block metadata (`blockName`, `week`, `day`), `order`, `effortZone`, warmup/cooldown power bands, and the full `intervals` array (each with `durationMin`, `powerLowPct`, `powerHighPct`, `count`, `recoveryMin`)
+- the artifact relative path (e.g. `prescriptions/{arc_id}.yaml`)
+
+Also emit **one workout-adaptation event** containing:
+
+- the completed workout: name, date, and the source activity ID from Intervals.icu
+- the objective deltas — prescription vs. execution metrics gathered in Phase 1 (power targets met/missed, duration completed, fade/drift)
+- the subjective inputs gathered in Phase 2 (RPE, sensations, recovery context, in-session modifications)
+- the approved rationale linking the Phase 3 evidence to the change
+- the stream-analysis results: for each analysis that ran in step 2b, the metric value and its threshold classification (green/amber/red per persona thresholds)
+- the signal interactions noted during Synthesize — how the analyses combined with TSB/HRV/CTL to inform the recommendation
+- `action_targets`: the session IDs the adaptation acts on
+- the compatibility path of the adaptation log (e.g. `coaching/adaptations.md`)
+
+If Phase 3 concludes no prescription change is warranted, the change set carries only the workout-adaptation event.
+
+**Monitoring contributions (merged BEFORE Phase 4)**
+
+Before Phase 4 begins, collect due monitoring contributions so ONE preview
+covers everything:
+
+1. Invoke the `monitoring-rollup` skill in **CONTRIBUTION MODE** with
+   `source = adapt:{block}-{week}-{session}` and the session context already
+   gathered. It reads `{coaching_docs_dir}/tracking/concerns.yaml`, gathers
+   any DUE active concern, and RETURNS typed `state_changes` (keyed
+   `monitoring:<concern-id>:<signal>` current state) and append-only
+   `events` — it never previews, never applies, and never writes.
+2. Merge both arrays into THIS change set. The merged change set is what
+   Phase 4 previews: one plan hash and one approval cover the prescription
+   adaptation, the workout-adaptation event, and all due monitoring changes
+   together.
+3. If no concern is active or due, monitoring-rollup returns EMPTY arrays.
+   Merge them and continue — the parent's single preview stands; never
+   produce a second preview for monitoring.
+
 ---
+
 
 ### Phase 4 — Propose _(requires explicit approval)_
 
@@ -167,6 +208,7 @@ Propose specific changes to the next workout. For each change state explicitly:
 
 - **What** changes — interval count, duration, intensity target, rest period, structure
 - **Why** — the specific reasoning from Phase 3 that drives this change
+- **Tradeoffs** — what will have to change (other sessions in the plan, recovery, or anything outside the plan) to support this change.
 
 Example format:
 
@@ -180,46 +222,33 @@ Example format:
 
 Compute the numeric approximations from `hrv_trend_result.baselines.long_mean` and `hrv_trend_result.baselines.long_sd`. This recalibrates gates automatically as the baseline drifts.
 
-Wait for **explicit approval, rejection, or modification**. Do not write any files until the athlete approves.
+**Before presenting anything**, call `engram_capture_preview` with the Phase 3 merged `StructuredChangeSet` — the single preview covers the prescription adaptation, the workout-adaptation event, and any due monitoring contributions as one plan.
+
+If the preview returns blocked, STOP: Phase 4 cannot proceed until the input is corrected and a preview succeeds.
+
+Present TOGETHER, in one message:
+
+1. The human coaching proposal: for each change, **What** changes, **Why**, and any **Tradeoffs** (including the HRV gates above when they fired).
+2. The record plan from the preview: which records will be created, refined, superseded, or retired.
+3. The generated compatibility artifact paths that will regenerate (e.g. `prescriptions/{arc_id}.yaml`, `coaching/adaptations.md`).
+4. The exact `plan_hash` from the preview result.
+
+Ask for approval. Approval must explicitly cover BOTH the coaching action AND the record/artifact plan identified by that exact `plan_hash` — approving the adaptation approves the durable mutation of the same content.
+
+Wait for **explicit approval, rejection, or modification**. On modification, rebuild the change set, re-run `engram_capture_preview`, and present the new hash.
 
 ---
 
-### Phase 5 — Write _(with approval)_
+### Phase 5 — Apply _(with approved hash)_
 
-Write three artifacts:
+Call `engram_capture_apply` with ONLY the exact `plan_hash` the athlete approved. Never edit any file directly and never invoke indexing tools by hand — every prescription YAML, the adaptation log, and the index are updated by the apply pipeline (records → guarded index refresh → regenerated compatibility views).
 
-**1. Updated prescription file**
-Apply approved changes to the relevant prescription YAML in `{prescriptions_dir}/`.
+Outcome handling:
 
-**2. Reasoning record**
-Create `{coaching_docs_dir}/{season}/{training-phase}/{week}/YYYY-MM-DD-{workout-name}-adaptation.md` with:
-
-- Workout performed (name, date)
-- Prescription vs. actual (key metrics)
-- Subjective inputs gathered (RPE, sensations, context)
-- What changed and the explicit reasoning
-- Any patterns noted for future Orient phases
-- Stream analysis results: for each analysis that ran, the metric value, threshold classification, and key interactions noted during Synthesize. Format:
-  ```
-  ## Stream Analysis
-  - [analysis_key]: [value] ([classification]) — [brief detail]
-
-  ## Signal Interactions
-  - [how stream analyses combined with TSB/HRV/CTL to inform the recommendation]
-  ```
-  This section persists analysis results into QMD for longitudinal querying. Future Orient phases can query: "what has aerobic decoupling looked like over the past month?" or "power curve trend across the current block."
-
-Create intermediate directories if they do not exist: `mkdir -p {coaching_docs_dir}/{season}/{training-phase}/{week}/`
-
-**3. QMD index update**
-
-```bash
-qmd update
-```
-
-**4. Auto-tail monitoring-rollup**
-
-Invoke the `monitoring-rollup` skill in auto-tail mode with `--source=adapt:{block}-{week}-{session}` and the session context already gathered. It captures any DUE active monitoring concerns, appends to their logs, and regenerates their Doctor-Prep summaries. If `concerns.yaml` is absent or has no active/due concerns, monitoring-rollup is a silent no-op — never block on it.
+- **stale**: the records changed since preview. Return to Phase 4: re-run `engram_capture_preview`, present the fresh record plan and new `plan_hash`, and obtain fresh athlete approval before applying again.
+- **apply failure**: stop Phase 5. No compatibility view is written and none may be edited by hand; diagnose and retry through the tools.
+- **committed with a stale index or stale views**: the records ARE authoritative — report the authoritative record IDs to the athlete together with the materialized paths and the exact retry state: re-calling `engram_capture_apply` with the SAME committed `plan_hash` in the same session reruns only materialization and never re-approves or re-applies the record mutations.
+- **committed clean**: report the applied record IDs and the regenerated compatibility view paths.
 
 ---
 

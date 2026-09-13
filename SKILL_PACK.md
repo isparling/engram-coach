@@ -34,6 +34,27 @@ Built-in policies are generic. Create a custom policy with [`PERSONA_SCHEMA.md`]
 
 See [`SETUP.md`](SETUP.md) for the detailed configuration contract.
 
+## Structured capture contract
+
+Skills that change coaching records do not write state files directly. They
+call `engram_capture_preview({ change_set })`, present the returned mutation
+plan for approval against its exact plan hash, and commit with
+`engram_capture_apply({ plan_hash })`. Records declare a `details.recordRole`
+of `state` (superseded by approved changes), `event` (append-only), or
+`report-claim` (a conclusion tied to an approved report). Prescription YAML,
+consultation/monitoring logs, and doctor-prep summaries are generated
+compatibility views carrying a `GENERATED FROM ENGRAM ACTIVE RECORDS.
+DO NOT EDIT DIRECTLY.` warning header — never edited directly. Long-form
+reports (`RACE_REPORT.md`, block `SUMMARY.md`, `SEASON_REVIEW.md`, methodology
+and arc-overview documents) remain canonical approved documents authored by
+their skills.
+
+Ambient conversation capture uses an explicit provider/model from
+`.engram-coach/config.json` (`capture.model`; `ENGRAM_COACH_CAPTURE_MODEL`
+overrides the model only). See [`SETUP.md`](SETUP.md) §7 for the authority
+model, retry semantics, and the dry-run migration sequence
+(`scan` → `apply-baseline` → `emit-change-set` → `compare`).
+
 ## Skills
 
 | Skill | Invocation | Purpose |

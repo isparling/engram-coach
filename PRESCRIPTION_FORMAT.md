@@ -58,6 +58,7 @@ Each item in the `sessions` list represents one training session.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `session_id` | string | yes | Durable workout identity (e.g., `workout-base-intervals`). Rescheduling or renaming a session NEVER changes its `session_id`; all newly generated prescriptions must provide it. Legacy files gain one deterministically during migration. |
 | `week` | integer | yes | Week number within this block (1-indexed) |
 | `day` | string | yes | Day abbreviation: `Mon` `Tue` `Wed` `Thu` `Fri` `Sat` `Sun` |
 | `session_date` | string | yes | ISO date (YYYY-MM-DD). Used for active block detection. |

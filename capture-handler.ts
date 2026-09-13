@@ -37,6 +37,7 @@ import {
 import { loadEngramCoachConfig, type EngramCoachRuntimeConfig } from "./engram-coach-config.ts";
 import { deriveCanonicalEntityKey } from "./engram-coach-keys.ts";
 import { validateEnvelope } from "./engram-coach-reconciliation.ts";
+import { canonicalJson } from "./engram-coach-structured-capture.ts";
 
 /**
  * Host mechanics supplied by the extension. It owns no coaching ontology: it
@@ -98,16 +99,6 @@ export function appliedEntityKeys(toolCalls: readonly TurnToolCall[]): Set<strin
 // ---------------------------------------------------------------------------
 // Record construction
 // ---------------------------------------------------------------------------
-
-function canonicalJson(value: unknown): string {
-  if (value === undefined || value === null) return "null";
-  if (typeof value === "string" || typeof value === "boolean" || typeof value === "number") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right));
-  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
-}
 
 /**
  * Deterministic ambient record ID. Session, the stable turn index, the

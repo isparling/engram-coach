@@ -1,0 +1,19 @@
+# Synthetic monitoring-concern registry used by the migration tests.
+# Shape mirrors the athlete's real `tracking/concerns.yaml`: each concern
+# declares its durable id, activity flag, log path, and capture fields; the
+# doctor-prep summary path is declared once for the whole registry.
+doctor_prep: monitoring/doctor-prep.md
+concerns:
+  - id: sleep-quality
+    name: Sleep quality
+    active: true
+    cadence_days: 7
+    log: monitoring/sleep-quality.md
+    fields: [date, signal, status, notes]
+    record_negatives: true
+  - id: left-calf
+    name: Left calf tightness
+    active: false
+    cadence_days: 14
+    log: monitoring/left-calf.md
+    fields: [date, signal, status, notes]

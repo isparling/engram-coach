@@ -87,14 +87,21 @@ export type NormalizedCaptureItem = {
 // Canonical JSON + deterministic hashing
 // ---------------------------------------------------------------------------
 
-/** Sorted-key, whitespace-free JSON — the canonical byte form for hashing. */
-export function canonicalJson(value: JsonValue): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (typeof value === "object" && value !== null) {
-    const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right));
-    return `{${entries.map(([key, item]) => `${canonicalJson(key)}:${canonicalJson(item)}`).join(",")}}`;
+/**
+ * Recursive canonical JSON — THE pack-wide canonical byte form for hashing
+ * and value comparison. Object keys are sorted at EVERY depth (`localeCompare`);
+ * array order is preserved verbatim because sequences are meaningful;
+ * primitives and `null` emit as JSON; `undefined` emits as `null` so partial
+ * objects hash deterministically.
+ */
+export function canonicalJson(value: unknown): string {
+  if (value === undefined || value === null) return "null";
+  if (typeof value === "string" || typeof value === "boolean" || typeof value === "number") {
+    return JSON.stringify(value);
   }
-  return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right));
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
 }
 
 function sha24Hex(text: string): string {
@@ -472,7 +479,7 @@ export function validateChangeSet(changeSet: JsonObject): ValidatedChangeSet | I
  * latest explicit effective date — NEVER from ambient wall-clock time,
  * which would make otherwise identical previews hash differently.
  */
-export function buildAggregateCandidate(valid: ValidatedChangeSet): KnowledgeEnvelope {
+export function buildAggregateCandidate(valid: ValidatedChangeSet, spaceId: string): KnowledgeEnvelope {
   const today = valid.items
     .map((item) => item.effectiveAt)
     .sort((left, right) => left.localeCompare(right))
@@ -505,7 +512,7 @@ export function buildAggregateCandidate(valid: ValidatedChangeSet): KnowledgeEnv
       items: valid.items,
     },
     scope: {
-      space: engramCoachPackId,
+      space: spaceId,
       subjects: [],
       topics: ["coaching:capture"],
       contexts: [],
@@ -529,6 +536,7 @@ export function buildAggregateCandidate(valid: ValidatedChangeSet): KnowledgeEnv
  * binding-selected pack and hands back the DTO union verbatim.
  */
 export type PreviewTools = {
+  spaceId: string;
   previewCandidate(candidate: KnowledgeEnvelope): Promise<HostCapturePreview>;
 };
 
@@ -591,7 +599,7 @@ export async function previewStructuredCapture(
 ): Promise<CapturePreview> {
   const valid = validateChangeSet(changeSet);
   if (!valid.ok) return { schemaVersion: 0, status: "blocked" as const, errors: valid.errors };
-  const candidate = buildAggregateCandidate(valid);
+  const candidate = buildAggregateCandidate(valid, tools.spaceId);
   const host = await tools.previewCandidate(candidate);
   if (host.status === "blocked") return { schemaVersion: 0, status: "blocked" as const, errors: host.errors };
   const artifacts = [...new Set(

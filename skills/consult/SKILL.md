@@ -86,6 +86,43 @@ Reason aloud before proposing anything. Cover:
 - Emphasis relevant patterns from QMD history. Call out if this matches prior lessons/patterns/successes/mistakes.
 - Reference ATHLETE_PROFILE.md when patterns from prior blocks are relevant to the consultation question. Cite the source tag in your reasoning so the athlete can trace the basis (e.g., "based on the recovery pattern from `[block-review:build-1-2026]`").
 
+Alongside the reasoning above, assemble the typed domain input for this consultation as a `StructuredChangeSet`. If Phase 3 reasoning concludes the prescription should change, emit **one state change** containing:
+
+- `entity_type: "prescription"` with `key_components` carrying `arc_id` and the durable `session_id`
+- the effective date of the change
+- a concise statement of what changes and why
+- the COMPLETE updated prescription session value — never a prose patch. The value must carry every field of the session: `sessionId`, `sessionDate`, `sessionName`, block metadata (`blockName`, `week`, `day`), `order`, `effortZone`, and the full `intervals` array (each with `durationMin`, `powerLowPct`, `powerHighPct`, `count`, `recoveryMin`)
+- the artifact relative path (e.g. `prescriptions/{arc_id}.yaml`)
+
+Also emit **one consultation event** containing:
+
+- the athlete's question or concern
+- the subjective inputs gathered (sickness, fatigue, life stress)
+- the decision rationale linking Phase 3 evidence to the action
+- `action_targets`: the session IDs the decision acts on
+- the compatibility path of the consultation log (e.g. `coaching/consultations.md`)
+
+If no prescription change is warranted, the change set carries only the consultation event.
+
+**Monitoring contributions (merged BEFORE Phase 4)**
+
+Before Phase 4 begins, collect due monitoring contributions so ONE preview
+covers everything:
+
+1. Invoke the `monitoring-rollup` skill in **CONTRIBUTION MODE** with
+   `source = consult:{YYYY-MM-DD}` and the context already gathered this
+   session. It reads `{coaching_docs_dir}/tracking/concerns.yaml`, gathers
+   any DUE active concern, and RETURNS typed `state_changes` (keyed
+   `monitoring:<concern-id>:<signal>` current state) and append-only
+   `events` — it never previews, never applies, and never writes.
+2. Merge both arrays into THIS change set. The merged change set is what
+   Phase 4 previews: one plan hash and one approval cover the prescription
+   change, the consultation event, and all due monitoring changes together.
+3. If no concern is active or due, monitoring-rollup returns EMPTY arrays.
+   Merge them and continue — the parent's single preview stands; never
+   produce a second preview for monitoring.
+
+
 This phase is **explanatory only**. No changes proposed yet. The athlete can push back on any part of the reasoning before you proceed.
 
 ### Phase 4 — Propose/Answer _(requires explicit approval)_
@@ -97,36 +134,34 @@ For each change, explicitly state:
 - **Why** — the specific reasoning from Phase 3 that drives this change
 - **Tradeoffs** - what will have to change (whether other parts of plan, or outside scope of athletic endoavors, or anything else) to support this change.
 
-Wait for **explicit approval, rejection, or modification**. Do not write any files until the athlete approves.
+**Before presenting anything**, call `engram_capture_preview` with the Phase 3 merged `StructuredChangeSet` — the single preview covers the prescription change, the consultation event, and any due monitoring contributions as one plan.
 
+If the preview returns blocked, STOP: Phase 4 cannot proceed until the input is corrected and a preview succeeds.
 
-### Phase 5 — Write _(with approval)_
+Present TOGETHER, in one message:
 
-Write three artifacts:
+1. The human coaching proposal. Answer athlete's questions; do not coddle the athlete. Propose specific changes to the plan, and **be realistic** about what matches the training goals. For each change state:
+   - **What** changes — interval count, duration, intensity target, rest period, structure
+   - **Why** — the specific reasoning from Phase 3 that drives this change
+   - **Tradeoffs** - what will have to change (whether other parts of plan, or outside scope of athletic endoavors, or anything else) to support this change.
+2. The record plan from the preview: which records will be created, refined, superseded, or retired.
+3. The generated compatibility artifact paths that will regenerate (e.g. `prescriptions/{arc_id}.yaml`, `coaching/consultations.md`).
+4. The exact `plan_hash` from the preview result.
 
-**1. Updated prescription file**
-If phase 4 results in changes to workouts, apply approved changes to the relevant prescription YAML in `{prescriptions_dir}/`.
+Ask for approval. Approval must explicitly cover BOTH the coaching action AND the record/artifact plan identified by that exact `plan_hash` — approving the advice approves the durable mutation of the same content.
 
-**2. Reasoning records**
-Add to the active phase's consultation record `{coaching_docs_dir}/{season}/{training-phase}/consultations.md`:
+Wait for **explicit approval, rejection, or modification**. On modification, rebuild the change set, re-run `engram_capture_preview`, and present the new hash.
 
-- The athlete's questions, concerns;  what they were seaeking consultation about.
-- Subjective inputs gathered sick, tired, new things happening in life?
-- What changed and the explicit reasoning
-- Any patterns noted for future Orient phases
+### Phase 5 — Apply _(with approved hash)_
 
-Create intermediate directories if they do not exist: `mkdir -p {coaching_docs_dir}/{season}/{training-phase}/`
-Create the phase's consultation file if it doesn't already exist: `touch {coaching_docs_dir}/{season}/{training-phase}/consultations.md`
+Call `engram_capture_apply` with ONLY the exact `plan_hash` the athlete approved. Never edit any file directly — every prescription YAML, the consultation log, and the qmd index are updated by the apply pipeline (records → guarded index refresh → regenerated compatibility views).
 
-**3. QMD index update**
+Outcome handling:
 
-```bash
-qmd update
-```
-
-**4. Auto-tail monitoring-rollup**
-
-Invoke the `monitoring-rollup` skill in auto-tail mode with `--source=consult:{YYYY-MM-DD}` and the context already gathered. It captures any DUE active monitoring concerns, appends to their logs, and regenerates their Doctor-Prep summaries. If `concerns.yaml` is absent or has no active/due concerns, monitoring-rollup is a silent no-op — never block on it.
+- **stale**: the records changed since preview. Return to Phase 4: re-run `engram_capture_preview`, present the fresh record plan and new `plan_hash`, and obtain fresh athlete approval before applying again.
+- **apply failure**: stop Phase 5. No compatibility view is written and none may be edited by hand; diagnose and retry through the tools.
+- **committed with a stale index or stale views**: the records ARE authoritative — report the authoritative record IDs to the athlete and the exact retry state: re-calling `engram_capture_apply` with the SAME committed `plan_hash` in the same session reruns only materialization and never re-approves or re-applies the record mutations.
+- **committed clean**: report the applied record IDs.
 
 ---
 

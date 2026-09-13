@@ -1,20 +1,22 @@
 ---
 name: set-goal
-description: Use when establishing a new training arc toward a new goal — typically between major training cycles, after a race, or when goals change. Produces a full arc: arc-overview doc, per-sub-block methodology docs, per-sub-block prescription YAMLs, and scaffolded consultations.md files. Distinct from intake (one-time athlete setup) and consult (advice within an existing plan). Requires Intervals.icu MCP and config.json configured.
+description: Use when establishing a new training arc toward a new goal — typically between major training cycles, after a race, or when goals change. Produces a full arc: canonical arc-overview and methodology documents written directly, plus durable workout identities, structured prescription records, and explicit conclusions captured through the previewed engram capture channel; prescription YAML and consultation logs are generated views produced by materialization. Distinct from intake (one-time athlete setup) and consult (advice within an existing plan). Requires Intervals.icu MCP and config.json configured.
 ---
 
 # Set Goal
 
 ## Overview
 
-Workflow for establishing a new training arc toward a new goal. An "arc" is the multi-block journey from now to a target event (or fitness-maintenance goal). Decomposes into 2-4 named sub-blocks, each with its own methodology doc and prescription YAML. The arc is the unit of season-level planning; sub-blocks are the unit of `adapt-plan` and `block-review`.
+Workflow for establishing a new training arc toward a new goal. An "arc" is the multi-block journey from now to a target event (or fitness-maintenance goal). Decomposes into 2-4 named sub-blocks, each with its own methodology document; prescription state lives as structured records keyed by arc and durable session id. The arc is the unit of season-level planning; sub-blocks are the unit of `adapt-plan` and `block-review`.
+
+**Authority split:** the arc-overview document and every methodology document are canonical, approved documents this skill writes itself. Prescription YAML and consultation logs are GENERATED compatibility views rendered from active Engram records by materialization — never write or edit them directly.
 
 **This skill is RIGID — phases execute in exact order. Do not skip, reorder, or combine phases.**
 
 **When to use this skill vs. others:**
 - `intake` — one-time athlete onboarding (persona, paths, season). Run once per athlete.
-- `set-goal` — recurring "what's next" planning at season transitions, post-race, or when goals change. Produces a full arc with methodology docs + prescriptions.
-- `consult` — advisory within an existing plan. Produces a consultation log entry and targeted prescription edits, not a full arc.
+- `set-goal` — recurring "what's next" planning at season transitions, post-race, or when goals change. Produces a full arc with methodology docs plus structured prescription records.
+- `consult` — advisory within an existing plan. Appends a consultation event and targeted prescription edits, not a full arc.
 - `adapt-plan` — per-session post-workout adaptation.
 
 ## Workflow
@@ -23,17 +25,17 @@ Workflow for establishing a new training arc toward a new goal. An "arc" is the 
 digraph set_goal {
     "Phase 1: Orient" [shape=box];
     "Phase 2: Gather (goal+constraints)" [shape=box];
-    "Phase 3: Synthesize (arc shape)" [shape=box];
-    "Phase 4: Propose (arc + sub-blocks)" [shape=box];
+    "Phase 3: Synthesize (arc shape + change set)" [shape=box];
+    "Phase 4: Propose (preview under one hash)" [shape=box];
     "Athlete approves?" [shape=diamond];
-    "Phase 5: Write (5 artifact types)" [shape=box];
+    "Phase 5: Write docs, apply hash, materialize" [shape=box];
 
     "Phase 1: Orient" -> "Phase 2: Gather (goal+constraints)";
-    "Phase 2: Gather (goal+constraints)" -> "Phase 3: Synthesize (arc shape)";
-    "Phase 3: Synthesize (arc shape)" -> "Phase 4: Propose (arc + sub-blocks)";
-    "Phase 4: Propose (arc + sub-blocks)" -> "Athlete approves?";
-    "Athlete approves?" -> "Phase 5: Write (5 artifact types)" [label="yes"];
-    "Athlete approves?" -> "Phase 4: Propose (arc + sub-blocks)" [label="revise"];
+    "Phase 2: Gather (goal+constraints)" -> "Phase 3: Synthesize (arc shape + change set)";
+    "Phase 3: Synthesize (arc shape + change set)" -> "Phase 4: Propose (preview under one hash)";
+    "Phase 4: Propose (preview under one hash)" -> "Athlete approves?";
+    "Athlete approves?" -> "Phase 5: Write docs, apply hash, materialize" [label="yes"];
+    "Athlete approves?" -> "Phase 3: Synthesize (arc shape + change set)" [label="revise"];
 }
 ```
 
@@ -55,7 +57,7 @@ Read silently and announce findings before asking anything.
 
 1. **Recent block reviews** — find the most recent `SUMMARY.md` files under `{coaching_docs_dir}/{season}/*/SUMMARY.md`. Read up to 3 most recent.
 2. **Recent race reports** — find the most recent `RACE_REPORT.md` files under `{coaching_docs_dir}/{season}/races/*/RACE_REPORT.md`. Read up to 2 most recent.
-3. **Active prescription check** — list YAML files in `prescriptions_dir`. Find the file with the most recent `session_date`. Note when that block ended (most recent date) and how many days have elapsed since.
+3. **Active prescription check** — read the active generated prescription view(s) under `prescriptions_dir`. Find the session with the most recent `session_date`. Note when that block ended (most recent date) and how many days have elapsed since.
 4. **Current fitness state** — call `get_fitness_summary` via Intervals.icu MCP to retrieve current CTL, ATL, TSB.
 5. **QMD history search**:
    - `qmd query "arc planning"` and `qmd query "next block"` — surface any prior arc-planning records
@@ -100,41 +102,87 @@ Reason aloud about arc shape before proposing anything. Cover:
 6. **Carryover lessons.** Specifically cite ATHLETE_PROFILE entries that should shape the arc (`[race:...]`, `[block-review:...]` tags).
 7. **Key tradeoffs.** What this arc is choosing to NOT do vs. a "textbook" approach for the goal, and why those choices fit this athlete.
 
-This phase is **explanatory**. No artifacts written yet. The athlete can push back before Phase 4.
+This phase is **explanatory** about coaching reasoning — but while reasoning,
+build the complete structured change set IN PARALLEL so Phase 4 can preview it:
+
+**Durable session identity.** Generate each session's durable `session_id` ONCE
+(any stable unique slug, e.g. `ses{year}w{week}{day}`) and reuse that exact
+value in EVERY place the session appears: its prescription state item, its
+workout reference, narrative text, and the arc overview outline. The
+`session_date`, week position, title, and workout contents are MUTABLE
+attributes — rescheduling a session later changes those attributes but never
+its `session_id` or identity.
+
+**The change set.** Assemble ONE `StructuredChangeSet` covering the complete
+graph:
+
+- One prescription state item per planned session. `key_components` MUST carry
+  BOTH `arc_id` (the snake_case arc name) AND that session's durable
+  `session_id`; `details` carries the FULL prescription value for the session
+  (week, day, session date, name, modality, duration, effort zone or interval
+  structure, plus the shared arc goal object). Every session gets a complete
+  value — no placeholders to be filled in later.
+- Optionally one consultation event capturing significant goal-setting
+  reasoning that does not fit the methodology documents (the kickoff note),
+  with `action_targets` naming the affected durable session ids.
+- Explicit report claims for the conclusions embedded in the documents you are
+  about to write: one `arc-conclusion` claim anchored to the arc's first
+  prescription entity, and one `methodology-conclusion` claim per sub-block
+  anchored to a representative session of that sub-block. Each claim carries
+  its intended `source_document` path.
+
+The skill NEVER assigns record IDs, relationships (supersedes/refines/
+supports), statuses, or retirement targets — those are derived and owned by
+the pack during preview. If any session cannot be given a durable, unique
+`session_id`, stop and resolve that here; an unbound session must never reach
+Phase 4.
 
 ---
 
-### Phase 4 — Propose _(requires explicit approval)_
+### Phase 4 — Propose _(requires explicit approval of ONE hash)_
 
-Convert Phase 3 reasoning into a concrete arc structure. For each sub-block, state:
+Convert Phase 3 reasoning into a concrete arc structure, then bind everything
+to a single approval:
 
-- **Block name** (snake_case; will become `block_name` field in YAML and file basename)
-- **Dates** (start → end)
-- **Duration in weeks**
-- **Intent** (one or two sentences)
-- **Weekly structure outline** (key sessions, dominant modality)
-- **Success criteria** (what observable signals confirm the sub-block worked)
-
-Also propose:
-
-- **Arc name** (snake_case; will be the directory name under `{coaching_docs_dir}/{season}/`)
-- **Goal block** for prescription YAMLs (event/date/description)
-- **YAML scope** — write all sub-blocks upfront, or only the first 1-2? Recommend upfront unless the athlete prefers per-block lock-in.
-
-Wait for **explicit approval, rejection, or modification**. Iterate on Phase 4 as needed. Do not write any files until the athlete approves.
+1. **Preview FIRST.** Before presenting anything, call `engram_capture_preview`
+   with the complete change set. The pack derives every canonical entity key,
+   reconciles against active records, and returns the exact mutation plan plus
+   its `plan_hash`.
+2. **Check the preview.** Every prescription key must be bound —
+   `prescription:{arc_id}:{session_id}` with both components present. If ANY
+   session key came back unbound or ambiguous (or the preview is blocked),
+   CORRECT THE GRAPH (fix the `session_id`s / `arc_id`) and call
+   `engram_capture_preview` AGAIN. Never ask for approval against a blocked or
+   partially-bound preview.
+3. **Present together, under one approval:**
+   - For each sub-block: **Block name** (snake_case), **Dates** (start → end),
+     **Duration in weeks**, **Intent**, **Weekly structure outline**, and
+     **Success criteria**.
+   - The proposed **Arc name**, **Goal block**, and the canonical documents to
+     be written: the arc-overview document and each methodology document.
+   - The exact record mutations from the preview: which records will be
+     created (new prescription states, the kickoff consultation event, and the
+     arc/methodology report claims).
+   - The generated compatibility-view paths materialization will produce from
+     those records (the arc's prescription view and the consultation log) —
+     presented as outputs of apply, never as files you will write by hand.
+   - The exact **plan hash**.
+4. Wait for **explicit approval, rejection, or modification**. Approval covers
+   BOTH the coaching proposal AND the record/artifact mutations under that
+   hash. Iterate: any modification returns to Phase 3 to rebuild the change
+   set, re-previews, and presents a NEW hash. Do not write any files until the
+   athlete approves the current hash.
 
 ---
 
-### Phase 5 — Write _(with approval)_
+### Phase 5 — Write canonical documents, then apply _(with approval)_
 
-Write the following artifacts. Create intermediate directories as needed.
+Execute in this order.
 
-**1. Arc directory**
-```
-mkdir -p {coaching_docs_dir}/{season}/{arc_name}/
-```
+**1. Arc directory + canonical documents.** Create the arc directory and write
+the two kinds of CANONICAL, approved documents exactly as approved:
 
-**2. Arc overview doc** — `{coaching_docs_dir}/{season}/{arc_name}/arc-overview.md`
+**Arc overview doc** — `{coaching_docs_dir}/{season}/{arc_name}/arc-overview.md`
 
 Frontmatter:
 ```yaml
@@ -151,15 +199,15 @@ persona: {active_persona}
 
 Body covers:
 - Why this arc exists; what it differs from prior arcs
-- Arc shape table (sub-block / weeks / dates / intent)
+- Arc shape table (sub-block / weeks / dates / intent) — reference sessions by their durable `session_id`
 - Modality split across the arc
 - Success criteria (race outcome + mid-arc fitness markers)
 - Brake signals (arc-level)
 - Carryover lessons embedded in the arc (cite ATHLETE_PROFILE tags)
 - Open questions / mid-arc checkpoints
-- File index (lists the methodology docs + prescription YAMLs)
+- File index (lists the methodology documents and notes that prescription/consultation views generate from records)
 
-**3. Per-sub-block methodology doc** — for each sub-block, write `{coaching_docs_dir}/{season}/{arc_name}/{sub_block_name}-methodology.md`
+**Per-sub-block methodology doc** — for each sub-block, write `{coaching_docs_dir}/{season}/{arc_name}/{sub_block_name}-methodology.md`
 
 Frontmatter:
 ```yaml
@@ -183,40 +231,26 @@ Body covers:
 - Success criteria
 - Brake signals specific to this sub-block
 
-**4. Per-sub-block prescription YAML** — for each sub-block, write `{prescriptions_dir}/{arc_name}_{sub_block_name}.yaml`
+These documents are the skill's direct writes. Do NOT write prescription YAML
+or consultation logs — they are generated compatibility views.
 
-Follow `PRESCRIPTION_FORMAT.md` schema. Include `goal` block referencing the arc target. Use `block_name: {arc_name}_{sub_block_name}` (snake_case). Renumber `week` to be 1-indexed within the sub-block (not within the arc). Use absolute `session_date` values.
+**2. Apply the approved hash.** Call `engram_capture_apply` with the exact
+plan hash the athlete approved. The core commits the active records, retires
+anything superseded, runs the guarded qmd refresh, and invokes the pack
+materializers, which GENERATE the prescription YAML view and the consultation
+log from the newly active records.
 
-**5. Scaffold consultations.md per sub-block** — for each sub-block, create an empty consultations log:
-`{coaching_docs_dir}/{season}/{arc_name}/{sub_block_name}-consultations.md`
+- On success, collect the committed record IDs and the regenerated artifact
+  paths for the completion summary.
+- If the apply reports the plan as STALE (records changed after approval), do
+  not retry blindly: return to Phase 4, re-preview the same change set, present
+  the new hash, and obtain fresh approval.
+- Records commit authoritatively even if index refresh or materialization
+  hiccups; report any stale view honestly and retry apply with the SAME hash
+  if only materialization needs a rerun.
 
-Frontmatter:
-```yaml
----
-type: consultations
-season: {season}
-arc: {arc_name}
-sub_block: {sub_block_name}
----
-```
-
-Body starts as a single heading:
-```markdown
-# {Arc} — {Sub-block} Consultations
-
-_(empty — append entries via engram-coach:consult or engram-coach:adapt-plan)_
-```
-
-**6. Optional: kickoff consultation entry**
-
-If this `set-goal` invocation surfaced significant goal-setting reasoning beyond the methodology docs (e.g., the athlete articulated constraints that don't naturally fit in methodology), record an initial entry in the first sub-block's consultations.md. Otherwise skip — the methodology docs and arc overview carry the reasoning.
-
-**7. qmd update**
-```bash
-qmd update
-```
-
-**8. Completion summary** — output:
+**3. Completion summary** — output, with the EXACT record IDs from the applied
+plan and the EXACT generated view paths:
 
 ```
 ✓ Arc established: {arc_name}
@@ -225,7 +259,8 @@ Target:           {event} — {date} ({modality})
 Sub-blocks:       {count} ({list of names})
 Arc dates:        {start} → {end}
 Coaching docs:    {coaching_docs_dir}/{season}/{arc_name}/
-Prescriptions:    {prescriptions_dir}/{arc_name}_*.yaml
+Records created:  {committed record IDs, grouped as states/event/claims}
+Generated views:  {prescription view path}, {consultation log path}
 
 Next steps:
   1. {first sub-block name} starts {date}
@@ -241,13 +276,16 @@ Next steps:
 | Rule | Detail |
 |---|---|
 | Rigid phases | Execute in order — no skipping, reordering, or combining |
-| Approval gate | Nothing written until Phase 4 explicitly approved |
+| Approval gate | Nothing written until Phase 4 explicitly approves the exact plan hash |
 | One question at a time | Phase 2 never batches questions |
-| Synthesis before proposal | Phase 3 must complete before Phase 4 begins |
-| Sub-block decomposition required | Never write a single multi-month prescription. Always decompose into 2-4 named sub-blocks of 1-5 weeks each. |
-| Methodology + prescription together | Every sub-block gets both a methodology.md AND a prescription YAML. Methodology alone or prescription alone is insufficient. |
+| Synthesis before proposal | Phase 3 must complete (including the change set) before Phase 4 begins |
+| Sub-block decomposition required | Never prescribe a single multi-month block. Always decompose into 2-4 named sub-blocks of 1-5 weeks each. |
+| Canonical vs generated | Arc-overview and methodology documents are canonical and written by this skill; prescription YAML and consultation logs are generated views produced only by materialization — never write or edit them directly. |
+| Durable session identity | Generate each `session_id` once; reuse it everywhere. Rescheduling mutates dates/titles, never identity. Prescription keys always carry both `arc_id` and `session_id`. |
+| One hash binds all | Documents, record mutations, and generated paths are approved together under one plan hash; a stale apply returns to Phase 4 for a fresh preview and approval. |
+| No record internals | The skill never chooses record IDs, relationships, statuses, or retirement targets — the pack derives them at preview. |
 | Persona-change escalation | If Phase 3 identifies a persona mismatch, recommend re-running `intake` before continuing. Do not silently shift persona. |
-| Knowledge compounds | Arc-overview and methodology docs are durable artifacts; consultations.md captures session-by-session reasoning that builds on them. Future Orient phases benefit from the structured separation. |
+| Knowledge compounds | Arc-overview and methodology docs are durable artifacts; structured claims and consultation events build on them. Future Orient phases benefit from the structured separation. |
 
 ---
 

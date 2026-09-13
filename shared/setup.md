@@ -46,6 +46,17 @@ output:
 > `{plugin_root}/config.json.example` to `{cwd}/.engram-coach/config.json`
 > and configure your paths. See SETUP.md."
 
+Then verify the ambient capture model is configured. If
+`ENGRAM_COACH_CAPTURE_MODEL` is set nonblank, it overrides **only**
+`capture.model`; the timeout and candidate limits still come from the config's
+`capture` block. Otherwise read `capture.model`. It must be an explicit
+`provider/model` string — it is never inherited from the interactive session.
+If both sources are absent, stop and output:
+
+> "Ambient capture model not configured. Run the `intake` skill (it collects a
+> provider/model in Phase 3C), or add a `capture.model` value to
+> `{config_path}`. See SETUP.md."
+
 ## 3. Resolve active profile _(all skills)_
 
 `active_profile` → `profiles[active_profile]` → extract:
@@ -138,3 +149,59 @@ since. Surface any whose gap ≥ its `cadence_days`:
 
 Awareness only — capture happens via the monitoring-rollup auto-tail at write
 time. If the file is absent or has no active concerns, skip silently.
+
+## 11. Record authority and generated views _(all skills)_
+
+Engram active records are the authoritative store for mutable coaching state
+and chronological events. Every pack record declares a role in
+`details.recordRole`, exactly one of:
+
+- `state` — one current value for a canonical entity key; an approved change
+  creates a new active record, retires the prior one, and links them with
+  `relationships.supersedes`.
+- `event` — append-only history (consultations, monitoring entries); never
+  automatically replaced.
+- `report-claim` — a structured conclusion extracted from an approved
+  long-form report; it never replaces the report document.
+
+Canonical entity keys are derived by this pack, never accepted from a model:
+
+```text
+workout:<session-id>
+prescription:<arc-id>:<session-id>
+threshold:<sport>:lt1
+threshold:<sport>:lt2
+persona:<active-profile>
+monitoring:<concern-id>:<signal>
+```
+
+Workout identity is the durable `session_id`; dates, titles, week position,
+and workout contents are mutable attributes, not identity.
+
+**Generated compatibility views.** The prescription YAML files,
+`consultations.md`, monitoring logs, and doctor-prep summaries are rendered
+from committed records after each approved apply. Each carries a byte-exact
+warning header (`# GENERATED FROM ENGRAM ACTIVE RECORDS. DO NOT EDIT DIRECTLY.`
+in YAML, `<!-- GENERATED FROM ENGRAM ACTIVE RECORDS. DO NOT EDIT DIRECTLY. -->`
+in Markdown) and is **never edited directly** — direct edits are overwritten by
+the next materialization and break migration comparisons.
+
+**Canonical approved documents.** These remain skill-authored long-form
+documents, not generated views: `RACE_REPORT.md`, block `SUMMARY.md`,
+`SEASON_REVIEW.md`, methodology documents, and arc-overview documents.
+
+**Approval and retry semantics.** Skills that change records follow one
+ordering: preview records → athlete approves the exact plan hash → apply →
+guarded qmd refresh → regenerate compatibility views.
+
+- A stale apply (records changed since preview) deletes the pending plan and
+  requires a fresh preview plus fresh approval — never a re-apply of the old
+  hash.
+- If the qmd index reports `index-stale`, the committed records remain
+  authoritative and the index is simply retried later.
+- If materialization fails, the commit stands and reports stale views;
+  re-calling apply with the same committed hash in the same session reruns
+  only view regeneration, never the record mutations.
+
+Legacy workspaces migrate through the dry-run sequence documented in
+SETUP.md §7: `scan` → `apply-baseline` → `emit-change-set` → `compare`.

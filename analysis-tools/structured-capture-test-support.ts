@@ -39,7 +39,7 @@ let spaceCounter = 0;
  * Exact-mode related-record retrieval never invokes qmd, so no qmd
  * collection is registered.
  */
-export async function createSyntheticCaptureSpace(): Promise<SyntheticCaptureSpace> {
+export async function createSyntheticCaptureSpace(spaceId = SYNTHETIC_SPACE_ID): Promise<SyntheticCaptureSpace> {
   spaceCounter += 1;
   const root = await mkdtemp(join(tmpdir(), `engram-coach-capture-${spaceCounter}-`));
   const recordsRoot = join(root, "records");
@@ -49,7 +49,7 @@ export async function createSyntheticCaptureSpace(): Promise<SyntheticCaptureSpa
     qmdConfigDir: join(root, "qmd-config"),
     qmdCacheHome: join(root, "qmd-cache"),
     qmdCollectionName: `engram-coach-capture-${spaceCounter}`,
-    spaceId: SYNTHETIC_SPACE_ID,
+    spaceId,
     spaceRoot: root,
     manifestPath: join(root, "space.json"),
     bindingPath: join(root, "binding.json"),
@@ -157,6 +157,7 @@ export function testPreviewTools(space: SyntheticCaptureSpace): PreviewTools & {
   return {
     previews,
     plannedMutations,
+    spaceId: space.active.spaceId,
     previewCandidate: async (candidate): Promise<HostCapturePreview> => {
       previews.push(candidate);
       const { submittedAt, ...rest } = candidate;

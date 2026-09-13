@@ -37,6 +37,7 @@ import {
   type EngramCoachDetails,
   type EngramCoachEntityType,
 } from "./engram-coach-domain.ts";
+import { canonicalJson } from "./engram-coach-structured-capture.ts";
 
 // ---------------------------------------------------------------------------
 // Known destination topics used when validating scope topics.
@@ -389,14 +390,6 @@ function activeByKey(records: readonly KnowledgeRecord[]): Map<string, Knowledge
   return byKey;
 }
 
-function canonicalValue(value: JsonObject): string {
-  return JSON.stringify(
-    Object.entries(value)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => [key, item]),
-  );
-}
-
 function effectiveTime(value: string): number {
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
@@ -405,7 +398,7 @@ function effectiveTime(value: string): number {
 /** True when the candidate value keeps every current entry identical AND adds at least one new entry. */
 function isStrictSuperset(currentValue: JsonObject, candidateValue: JsonObject): boolean {
   for (const [key, item] of Object.entries(currentValue)) {
-    if (!(key in candidateValue) || canonicalValue({ [key]: candidateValue[key] }) !== canonicalValue({ [key]: item })) return false;
+    if (!(key in candidateValue) || canonicalJson(candidateValue[key]) !== canonicalJson(item)) return false;
   }
   return Object.keys(candidateValue).length > Object.keys(currentValue).length;
 }
@@ -483,6 +476,20 @@ function reconcileExplicit(input: PackReconcileInput): KnowledgeResult<PackRecon
       continue;
     }
     if (item.role === "event") {
+      // Deterministic record ids make an identical re-import of the same
+      // source entry the SAME event, not a new one: equal id plus equal
+      // canonical value and effective time dedupes to no mutation. Anything
+      // else falls through to a create that still fails closed at the host
+      // when the id already exists.
+      const twin = input.related.find((record) => record.id === item.recordId);
+      if (
+        twin !== undefined
+        && isJsonObject(twin.details["value"])
+        && item.effectiveAt === asString(twin.details["effectiveAt"])
+        && canonicalJson(item.value) === canonicalJson(twin.details["value"])
+      ) {
+        continue;
+      }
       mutations.push({
         action: "create",
         record: createdExplicitRecord(input.candidate, item, "new", {}, item.recordId),
@@ -519,7 +526,7 @@ function reconcileExplicit(input: PackReconcileInput): KnowledgeResult<PackRecon
       });
       continue;
     }
-    if (canonicalValue(item.value) === canonicalValue(priorValue) && item.effectiveAt === asString(prior.details["effectiveAt"])) {
+    if (canonicalJson(item.value) === canonicalJson(priorValue) && item.effectiveAt === asString(prior.details["effectiveAt"])) {
       continue;
     }
     if (isStrictSuperset(priorValue, item.value)) {
@@ -569,13 +576,23 @@ export function selectRelatedRecords(envelope: KnowledgeEnvelope): RelatedRecord
     const keys = [...new Set(items.map((item) => item.entityKey).filter((key): key is string => key !== null))];
     const keySet: Record<string, true> = {};
     for (const key of keys) keySet[key] = true;
+    // Append-only events are typically unbound, so their deterministic
+    // record ids are the only exact identity for recognizing an identical
+    // re-import of the same source entry.
+    const idSet: Record<string, true> = {};
+    for (const item of items) idSet[item.recordId] = true;
+    const descriptions = [
+      keys.length > 0 ? `exact entity keys: ${keys.join(", ")}` : "explicit capture without bound entity keys",
+      Object.keys(idSet).length > 0 ? "candidate record ids" : null,
+    ];
     return {
       mode: "exact",
-      description: keys.length > 0 ? `exact entity keys: ${keys.join(", ")}` : "explicit capture without bound entity keys",
+      description: descriptions.filter((part): part is string => part !== null).join("; "),
       matches: (record) =>
         record.pack.id === engramCoachPackId
-        && typeof record.details["entityKey"] === "string"
-        && keySet[record.details["entityKey"] as string] === true,
+        && ((typeof record.details["entityKey"] === "string"
+          && keySet[record.details["entityKey"] as string] === true)
+          || idSet[record.id] === true),
     };
   }
   return { mode: "search", query: coachingQuery(envelope) };

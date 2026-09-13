@@ -1,0 +1,44 @@
+{
+  "schema_version": 0,
+  "source": {
+    "skill": "consult",
+    "session_id": "omp-session-consult",
+    "turn_id": 3
+  },
+  "state_changes": [
+    {
+      "entity_type": "prescription",
+      "key_components": { "arc_id": "arc-a", "session_id": "workout-7f8c" },
+      "effective_at": "2026-08-25",
+      "statement": "Thursday changes from 4x8 at 295 W to 3x8 at 285 W after approved consultation on final-interval power fade",
+      "details": {
+        "sessionId": "workout-7f8c",
+        "sessionDate": "2026-08-27",
+        "sessionName": "Thursday Threshold",
+        "blockName": "Build 1",
+        "week": 2,
+        "day": "Thursday",
+        "order": 4,
+        "effortZone": "sweet spot",
+        "intervals": [
+          { "durationMin": 12, "powerLowPct": 88, "powerHighPct": 94, "count": 3, "recoveryMin": 6 }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "entity_type": "consultation",
+      "effective_at": "2026-08-25",
+      "statement": "Athlete consulted about heavy legs; prescription reduced because final-interval power faded 12%",
+      "action_targets": ["workout-7f8c"],
+      "details": {
+        "question": "My legs are heavy and Thursday looks brutal — should we adjust?",
+        "subjective_inputs": ["more tired than expected", "work stress elevated this week"],
+        "decision_rationale": "Power fade plus elevated life stress indicates accumulated fatigue, not a fitness gap; reduce load while keeping threshold exposure",
+        "compatibility_path": "coaching/consultations.md"
+      }
+    }
+  ],
+  "report_claims": []
+}

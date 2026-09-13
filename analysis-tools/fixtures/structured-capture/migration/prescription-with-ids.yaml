@@ -1,0 +1,40 @@
+# GENERATED FROM ENGRAM ACTIVE RECORDS. DO NOT EDIT DIRECTLY.
+# Legacy synthetic prescription used only by migration tests. Do not edit.
+block_name: base
+
+sessions:
+  - session_id: workout-4837f280b29eb03e
+    week: 1
+    day: Wed
+    session_date: 2026-07-08
+    session_name: W1_Easy
+    total_duration_min: 90
+    effort_zone: Z1-Z2
+
+  # Interval day already carries its stable ID and must be preserved verbatim.
+  - session_id: workout-base-intervals
+    week: 1
+    day: Sat
+    session_date: 2026-07-11
+    session_name: W1_Intervals
+    total_duration_min: 120
+    warmup_power_low_pct: 40
+    warmup_power_high_pct: 65
+    cooldown_power_low_pct: 35
+    cooldown_power_high_pct: 45
+    intervals:
+      - duration_min: 10
+        power_low_pct: 85
+        power_high_pct: 92
+        count: 3
+        recovery_min: 5
+        recovery_power_low_pct: 45
+        recovery_power_high_pct: 55
+
+  - session_id: workout-c25cb37dc7e7e8e2
+    week: 2
+    day: Wed
+    session_date: 2026-07-15
+    session_name: W2_Easy
+    total_duration_min: 90
+    effort_zone: Z1-Z2

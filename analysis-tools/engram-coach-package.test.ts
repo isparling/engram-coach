@@ -31,7 +31,7 @@
 
 import { describe, it, expect } from "vitest";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,7 +46,10 @@ const harnessDir = resolve(repoRoot, "../engram/harness");
 // `npm pack --json` and the resolver subprocess below are both producers we
 // author and control, so each JSON boundary is asserted against a named
 // type rather than re-verified with a generic runtime object guard.
-type PackManifest = { filename: string };
+type PackManifest = {
+  filename: string;
+  files: Array<{ path: string }>;
+};
 
 type ResolverResult = {
   packOk: boolean;
@@ -131,6 +134,28 @@ describe("packed module", () => {
       if (typeof manifest.filename !== "string") {
         throw new Error('npm pack --json inventory entry is missing a string "filename"');
       }
+      if (!Array.isArray(manifest.files)) {
+        throw new Error('npm pack --json inventory entry is missing a "files" array');
+      }
+      const packedPaths = manifest.files.map((file) => file.path);
+      expect(packedPaths).toEqual(
+        expect.arrayContaining([
+          "analysis-tools/hrv-trend.ts",
+          "analysis-tools/migrate-structured-capture.ts",
+          "analysis-tools/race-context.ts",
+          "analysis-tools/stream-analyze.ts",
+          "analysis-tools/tsb-predict.ts",
+        ]),
+      );
+      expect(
+        packedPaths.filter(
+          (path) =>
+            path.includes("/node_modules/") ||
+            path.includes("/fixtures/") ||
+            path.endsWith(".test.ts") ||
+            /(?:^|\/)(?:scan|change-set|migration-output)\.json$/.test(path),
+        ),
+      ).toEqual([]);
       const tarballPath = resolve(packDir, manifest.filename);
 
       tempDir = await mkdtemp(join(tmpdir(), "engram-coach-pack-"));
@@ -181,6 +206,20 @@ describe("packed module", () => {
       expect(result.viewIds).toContain("athlete-profile");
       expect(result.audienceIds).toContain("self-coach");
       expect(result.deliveryIds).toContain("profile-markdown");
+
+      // The capture config example must survive packaging with the shipped
+      // limits: intake writes this block verbatim, and ambient capture fails
+      // as a configuration error without an explicit model.
+      const packedExample = JSON.parse(
+        await readFile(
+          join(tempDir, "node_modules", "@isparling", "engram-coach", "config.json.example"),
+          "utf8",
+        ),
+      ) as { capture?: { model?: unknown; timeout_seconds?: unknown; max_candidates_per_turn?: unknown } };
+      expect(typeof packedExample.capture?.model).toBe("string");
+      expect((packedExample.capture?.model as string).length).toBeGreaterThan(0);
+      expect(packedExample.capture?.timeout_seconds).toBe(60);
+      expect(packedExample.capture?.max_candidates_per_turn).toBe(3);
     } finally {
       if (tempDir !== undefined) await rm(tempDir, { recursive: true, force: true });
       if (packDir !== undefined) await rm(packDir, { recursive: true, force: true });

@@ -37,8 +37,10 @@
  * authoritative regardless of materialization outcome.
  */
 
-import { isAbsolute, resolve } from "node:path";
-import { stringify as stringifyYaml } from "yaml";
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type {
   JsonObject,
   JsonValue,
@@ -50,6 +52,36 @@ import type {
   MaterializationResult,
 } from "./engram-coach-capture-types.ts";
 import { loadEngramCoachConfig, type EngramCoachRuntimeConfig } from "./engram-coach-config.ts";
+import { canonicalJson } from "./engram-coach-structured-capture.ts";
+type YamlModule = typeof import("yaml");
+
+/**
+ * Bun-compiled OMP cannot resolve bare dependencies from a pack imported
+ * after extension startup. Prefer native resolution, then anchor the same
+ * CommonJS load to the dependency's on-disk package manifest.
+ */
+function loadYamlModule(): YamlModule {
+  const requireFromPack = createRequire(import.meta.url);
+  try {
+    return requireFromPack("yaml") as YamlModule;
+  } catch (resolutionError) {
+    let directory = dirname(fileURLToPath(import.meta.url));
+    while (true) {
+      const manifestPath = resolve(directory, "node_modules", "yaml", "package.json");
+      if (existsSync(manifestPath)) {
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { main?: unknown };
+        if (typeof manifest.main === "string") {
+          return requireFromPack(resolve(dirname(manifestPath), manifest.main)) as YamlModule;
+        }
+      }
+      const parent = dirname(directory);
+      if (parent === directory) throw resolutionError;
+      directory = parent;
+    }
+  }
+}
+
+const { stringify: stringifyYaml } = loadYamlModule();
 
 /** Host mechanics supplied by the OMP extension — no coaching ontology here. */
 export type MaterializeTools = {
@@ -90,18 +122,6 @@ function asString(value: JsonValue | undefined): string | null {
 
 function asNumber(value: JsonValue | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/** Stable deep-equality over validated JSON values. */
-function canonicalJson(value: JsonValue): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (isObject(value)) {
-    const entries = Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`);
-    return `{${entries.join(",")}}`;
-  }
-  return JSON.stringify(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +387,16 @@ function eventBody(entry: MaterializationRecord): string {
 function renderChronologicalEntries(entries: readonly MaterializationRecord[]): string {
   return [...entries]
     .sort(chronological)
-    .map((entry) => `## ${entry.effectiveAt} — ${entry.sourceId}\n\n${eventBody(entry)}`)
+    .map((entry) => {
+      // Only verbatim legacy imports carry their ORIGINAL heading label as
+      // `value.title` next to `legacyMarkdown`; preferring it over the opaque
+      // source id lets a legacy round trip re-render byte-identically.
+      // Typed events always render the source id.
+      const isLegacyImport =
+        asString(entry.value.legacyMarkdown) !== null && asString(entry.value.sourcePath) !== null;
+      const label = isLegacyImport ? asString(entry.value.title) ?? entry.sourceId : entry.sourceId;
+      return `## ${entry.effectiveAt} — ${label}\n\n${eventBody(entry)}`;
+    })
     .join("\n\n");
 }
 
@@ -471,6 +500,12 @@ export function renderDoctorPrepSummary(
 
 type DesiredView = { kind: ArtifactKind; relativePath: string; absoluteTarget: string; content: string };
 
+function pathWithinArtifactRoot(kind: ArtifactKind, relativePath: string): string {
+  return kind === "prescription"
+    ? relativePath.replace(/^prescriptions\//, "")
+    : relativePath;
+}
+
 /**
  * Computes the complete desired view set from the active record set.
  * Render-level problems (invalid values, inconsistent metadata) surface as
@@ -509,7 +544,7 @@ export function computeDesiredViews(
       views.push({
         kind,
         relativePath,
-        absoluteTarget: resolve(root, relativePath),
+        absoluteTarget: resolve(root, pathWithinArtifactRoot(kind, relativePath)),
         content: outcome.content,
       });
     } else {
@@ -586,7 +621,7 @@ export async function materialize(
     try {
       const outcome = await tools.replaceArtifact({
         root: view.kind === "prescription" ? prescriptionsRoot : coachingDocsRoot,
-        relativePath: view.relativePath,
+        relativePath: pathWithinArtifactRoot(view.kind, view.relativePath),
         content: view.content,
       });
       if (outcome.status === "replaced") written.push(outcome);

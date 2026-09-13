@@ -116,30 +116,73 @@ Construct, but do not yet render:
 
 5. **Race-report integration:** what did the races reveal that block summaries alone wouldn't?
 
+6. **Form explicit report conclusions:** distill the atomic, explicitly
+   approved conclusions of the season review — facts that bear on existing
+   keyed state (persona fit verdicts, durable cross-block patterns tied to
+   thresholds or monitoring concerns). Each conclusion is recorded as an
+   entry of the `report_claims` array in the structured change set
+   (`StructuredReportClaim`) with ALL of:
+   - `entity_type`: `season-conclusion`
+   - `key_components`: the exact canonical state entity it bears on
+     (`entity_type` plus its durable identity components)
+   - `effective_at`: the effective time of the conclusion
+   - `statement`: one-sentence human-readable claim
+   - `source_document`: the relative path of the `SEASON_REVIEW.md` this
+     conclusion comes from
+   - `details`: the structured value of the conclusion
+
+   Narrative sections stay narrative — only these atomic conclusions
+   become records.
+
 ---
 
 ### Phase 4 — Draft _(shown to athlete)_
 
-Render the full `SEASON_REVIEW.md` using `templates/season-review.md` as the skeleton. Fill every section. Iterate until explicitly approved.
+Render the full `SEASON_REVIEW.md` using `templates/season-review.md` as the
+skeleton. Fill every section.
 
-The "Calibration Points to Promote" section at the bottom is the explicit list of bullets that will be passed to `lessons-rollup`. Bar is higher than block-level — only cross-block patterns confirmed by race execution OR pattern repetition across 2+ blocks.
+The "Calibration Points to Promote" section at the bottom is the explicit
+list of bullets that will be passed to `lessons-rollup`. Bar is higher than
+block-level — only cross-block patterns confirmed by race execution OR
+pattern repetition across 2+ blocks.
+
+**Record preview — one combined approval:** alongside the full report draft,
+call `engram_capture_preview({ change_set })` with the structured change set
+containing the Phase 3 `report_claims`. Show the complete report AND the
+record preview (the exact plan hash, each record's role/classification) to
+the athlete together. The athlete approves BOTH the report text and the
+capture plan under ONE approval; the approved plan hash is bound to this
+exact content. Iterate on both until explicitly approved. If the preview is
+blocked, fix the change set and re-preview — this phase cannot complete
+without a ready plan hash.
+
 
 ---
 
 ### Phase 5 — Write + Rollup _(with approval)_
 
-1. Write `{coaching_docs_dir}/{season}/SEASON_REVIEW.md`.
 
-2. **Auto-tail lessons-rollup** with:
+1. Write `{coaching_docs_dir}/{season}/SEASON_REVIEW.md`. **This document
+   write happens FIRST and is the authoritative canonical season review —
+   it is never regenerated from records.** If this write fails for any
+   reason, STOP: do not apply any records; report the failure to the athlete.
+
+2. **Apply the approved capture plan:** only after the document write
+   succeeded, call `engram_capture_apply({ plan_hash })` with the exact
+   plan hash approved in Phase 4.
+   - `status: "stale"` → the pending preview was discarded; return to
+     Phase 4, re-preview, and get fresh approval.
+   - Report any index or compatibility-view staleness from the result to
+     the athlete (records remain authoritative either way); a stale index
+     refresh is retried via the guarded mechanism, never by editing views.
+
+3. **Auto-tail lessons-rollup** ONLY after BOTH the document write AND the
+   report claims apply succeeded:
    - `--source=season:{season}`
    - The "Calibration Points to Promote" bullets as the append list.
-   Non-additive diffs gate on approval.
-
-
-3. **QMD index update:**
-   ```bash
-   qmd update && qmd embed
-   ```
+   Non-additive diffs gate on approval. The rollup keeps its own
+   harness-backed claim gate; the review is never reconstructed from the
+   captured claims.
 
 ---
 
@@ -148,8 +191,10 @@ The "Calibration Points to Promote" section at the bottom is the explicit list o
 | Rule | Detail |
 |------|--------|
 | Rigid phases | Execute in order — no skipping, reordering, or combining |
-| Approval gate | Nothing written until Phase 4 draft explicitly approved |
+| Approval gate | Nothing written until Phase 4 draft explicitly approved — report text and capture plan approved together under one approval |
 | No per-activity compute | All stream-derived signals come from existing block summaries and race reports |
 | Wellness data is monthly-summarized | Season wellness trajectory loads only monthly summary points, never per-day |
 | Partial-coverage tolerance | Missing block summaries are flagged and the season retrospective continues with a gap annotation |
-| Auto-tail rollup | Phase 5 invokes lessons-rollup with cross-block patterns as the promotion list |
+| Canonical report first | Phase 5 writes `SEASON_REVIEW.md` FIRST; a failed document write stops before any record apply |
+| Explicit conclusions only | Only the atomic `report_claims` from the approved change set become records; narrative stays in the document |
+| Auto-tail rollup | lessons-rollup runs only after BOTH the document write and claims apply succeed |

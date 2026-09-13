@@ -1,0 +1,70 @@
+{
+  "schema_version": 0,
+  "source": {
+    "skill": "adapt-plan",
+    "session_id": "omp-session-adapt",
+    "turn_id": 0
+  },
+  "state_changes": [
+    {
+      "entity_type": "prescription",
+      "key_components": { "arc_id": "arc-a", "session_id": "w3-thu-sublt2" },
+      "effective_at": "2026-08-22",
+      "statement": "Next sub-LT2 session reduced from 4x12 to 3x12 after RPE 8.5 and amber aerobic decoupling on the completed workout",
+      "details": {
+        "blockName": "Build 1",
+        "goal": { "event": "Example Endurance Event", "date": "2027-06-15" },
+        "order": 3,
+        "sessionId": "w3-thu-sublt2",
+        "week": 3,
+        "day": "thursday",
+        "sessionDate": "2026-08-22",
+        "sessionName": "Sub-LT2 intervals (reduced)",
+        "modality": "bike",
+        "totalDurationMin": 66,
+        "effortZone": "sub-lt2",
+        "warmup": { "powerLowPct": 50, "powerHighPct": 65 },
+        "cooldown": { "powerLowPct": 50, "powerHighPct": 60 },
+        "intervals": [
+          { "durationMin": 12, "powerLowPct": 88, "powerHighPct": 92, "count": 3, "recoveryMin": 3 }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "entity_type": "workout-adaptation",
+      "effective_at": "2026-08-22",
+      "statement": "Adapted the next sub-LT2 prescription after the 2026-08-22 completed workout: reduced from 4x12 to 3x12",
+      "action_targets": ["prescription:arc-a:w3-thu-sublt2"],
+      "details": {
+        "title": "W3 Thursday sub-LT2 reduced from 4x12 to 3x12",
+        "summary": "Prescription vs execution: planned 4x12 sub-LT2 intervals at 88-92% LT2 power; completed all four with final-interval power fading 11% below target. Subjective: RPE 8.5, heavy legs from the first interval, poor sleep the night before. Stream analysis: aerobic_decoupling 6.8% (amber); interval_execution_quality CV 4.2% (green). Signal interactions: amber decoupling and RPE 8.5 contradict push-zone TSB (+7); green execution quality rules out a pacing error, pointing to cumulative fatigue. Approved adaptation: next sub-LT2 session reduced from 4x12 to 3x12.",
+        "completed_workout": {
+          "name": "W2 Tuesday sub-LT2",
+          "date": "2026-08-22",
+          "activity_id": "123456789"
+        },
+        "objective_deltas": {
+          "final_interval_power_fade_pct": -11,
+          "duration_completed_min": 74,
+          "duration_planned_min": 76
+        },
+        "subjective_inputs": {
+          "rpe": 8.5,
+          "sensations": "heavy legs early, HR drift on final intervals",
+          "sleep_quality": "poor"
+        },
+        "approved_rationale": "Cumulative fatigue is higher than block average; preserving freshness outweighs hitting volume with a harder session on week 3 Thursday.",
+        "stream_analyses": [
+          { "key": "aerobic_decoupling", "value": 6.8, "classification": "amber" },
+          { "key": "interval_execution_quality", "value": 4.2, "classification": "green" }
+        ],
+        "signal_interactions": "Amber aerobic decoupling and RPE 8.5 contradict push-zone TSB (+7); green interval execution quality rules out a pacing error.",
+        "source_activity_id": "123456789",
+        "compatibility_path": "coaching/adaptations.md"
+      }
+    }
+  ],
+  "report_claims": []
+}

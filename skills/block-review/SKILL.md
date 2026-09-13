@@ -119,6 +119,32 @@ Ask exactly three questions, in order. Wait for each answer before asking the ne
 Present the complete `SUMMARY.md` content as a draft. The athlete can request
 changes before anything is written. Iterate until explicitly approved.
 
+**Explicit report conclusions:** alongside the narrative sections, distill
+the block's atomic, explicitly approved conclusions — facts that bear on
+existing keyed state (thresholds, persona signals, monitoring concerns).
+Each conclusion is recorded as an entry of the `report_claims` array in
+the structured change set (`StructuredReportClaim`) with ALL of:
+- `entity_type`: `block-conclusion`
+- `key_components`: the exact canonical state entity it bears on
+  (`entity_type` plus its durable identity components)
+- `effective_at`: the effective time of the conclusion
+- `statement`: one-sentence human-readable claim
+- `source_document`: the relative path of the `SUMMARY.md` this conclusion
+  comes from
+- `details`: the structured value of the conclusion
+
+Narrative stays in the document; only these atomic conclusions become
+records.
+
+**Record preview — one combined approval:** alongside the full `SUMMARY.md`
+draft, call `engram_capture_preview({ change_set })` with the change set
+containing those `report_claims`. Show the complete report AND the record
+preview (the exact plan hash, each record's role/classification) together.
+The athlete approves BOTH under ONE approval; the approved plan hash is
+bound to this exact content. Iterate until explicitly approved. If the
+preview is blocked, fix the change set and re-preview — this phase cannot
+complete without a ready plan hash.
+
 **Document structure:**
 
 ```markdown
@@ -195,30 +221,42 @@ the first key session should confirm, and what would trigger a reassessment.
 
 ### Phase 4 — Write _(with approval)_
 
-Write two artifacts:
+Write, in this exact order:
 
-**1. Block summary document**
+**1. Block summary document — FIRST**
 
-Write `{coaching_docs_dir}/{season}/{block}/SUMMARY.md` with the approved content.
-Create the directory if it does not exist:
+Write `{coaching_docs_dir}/{season}/{block}/SUMMARY.md` with the approved
+content. Create the directory if it does not exist:
 ```bash
 mkdir -p {coaching_docs_dir}/{season}/{block}/
 ```
 
-**2. Auto-tail lessons-rollup**
+This is the authoritative canonical block summary — it is never regenerated
+from records. **If this write fails for any reason, STOP: do not apply any
+records; report the failure to the athlete.**
 
-Invoke the `lessons-rollup` skill with:
+**2. Apply the approved capture plan**
+
+Only after the document write succeeded, call
+`engram_capture_apply({ plan_hash })` with the exact plan hash approved in
+Phase 3.
+- `status: "stale"` → the pending preview was discarded; return to Phase 3,
+  re-preview, and get fresh approval.
+- Report any index or compatibility-view staleness from the result to the
+  athlete (records remain authoritative either way); a stale index refresh
+  is retried via the guarded mechanism, never by editing generated views.
+
+**3. Auto-tail lessons-rollup — only after BOTH succeed**
+
+Invoke the `lessons-rollup` skill ONLY after BOTH the `SUMMARY.md` write AND
+the report claims apply succeeded:
 - `--source=block-review:{normalized-block-name}`
-- The bullets from the `## Calibration Points for Future Blocks` section of the just-written SUMMARY.md as the append list.
+- The bullets from the just-written SUMMARY.md's
+  `## Calibration Points for Future Blocks` section as the append list.
 
-If the rollup's diff is purely additive, it auto-writes silently. If it would retire or rewrite an existing profile entry, it shows the diff and gates on athlete approval before writing.
-
-
-**3. QMD index update**
-
-```bash
-qmd update && qmd embed
-```
+The rollup keeps its own harness-backed claim gate; the report is never
+reconstructed from the captured claims. Non-additive diffs gate on athlete
+approval before writing.
 
 ---
 
@@ -227,8 +265,11 @@ qmd update && qmd embed
 | Rule | Detail |
 |------|--------|
 | Rigid phases | Execute in order — no skipping, reordering, or combining |
-| Approval gate | Nothing written until Phase 3 draft explicitly approved |
+| Approval gate | Nothing written until Phase 3 draft explicitly approved — report text and capture plan approved together under one approval |
 | One question at a time | Phase 2 never batches questions |
 | No full file reads | MCP for metrics, QMD for narrative — no prescription YAML reads beyond frontmatter, no full adaptation record reads |
 | Retroactive-safe | Works on past blocks; block date window comes from prescription YAML frontmatter, not "today" |
 | Data gaps are acceptable | Missing power curves, HRV gaps, or QMD misses are annotated and the skill continues — a partial summary is better than no summary |
+| Canonical report first | Phase 4 writes `SUMMARY.md` FIRST; a failed document write stops before any record apply |
+| Explicit conclusions only | Only the atomic `report_claims` from the approved change set become records; narrative stays in the document |
+| Auto-tail rollup | lessons-rollup runs only after BOTH the document write and claims apply succeed |

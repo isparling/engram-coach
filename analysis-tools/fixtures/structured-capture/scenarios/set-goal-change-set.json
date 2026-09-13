@@ -1,0 +1,197 @@
+{
+  "schema_version": 0,
+  "source": {
+    "skill": "set-goal",
+    "session_id": "omp-set-goal-arc-1",
+    "turn_id": 0
+  },
+  "state_changes": [
+    {
+      "entity_type": "prescription",
+      "key_components": { "arc_id": "autumn_base", "session_id": "ses2026w01tue" },
+      "effective_at": "2026-09-01",
+      "statement": "W1 Tue sub-threshold: 3x10 min at 85-92% FTP with 5 min recovery, 120 min total",
+      "details": {
+        "blockName": "autumn_base",
+        "subBlock": "base",
+        "goal": {
+          "event": "Gravel 200",
+          "date": "2026-11-15",
+          "description": "Endurance-focused autumn base arc toward the late-season gravel event."
+        },
+        "order": 1,
+        "sessionId": "ses2026w01tue",
+        "week": 1,
+        "day": "Tue",
+        "sessionDate": "2026-09-01",
+        "sessionName": "W1_SubLT2",
+        "modality": "ride",
+        "totalDurationMin": 120,
+        "warmup": { "powerLowPct": 40, "powerHighPct": 65 },
+        "cooldown": { "powerLowPct": 35, "powerHighPct": 45 },
+        "intervals": [
+          {
+            "durationMin": 10,
+            "powerLowPct": 85,
+            "powerHighPct": 92,
+            "count": 3,
+            "recoveryMin": 5,
+            "recoveryPowerLowPct": 45,
+            "recoveryPowerHighPct": 55
+          }
+        ]
+      }
+    },
+    {
+      "entity_type": "prescription",
+      "key_components": { "arc_id": "autumn_base", "session_id": "ses2026w01sat" },
+      "effective_at": "2026-09-05",
+      "statement": "W1 Sat long endurance ride, 240 min in Z1-Z2",
+      "details": {
+        "blockName": "autumn_base",
+        "subBlock": "base",
+        "goal": {
+          "event": "Gravel 200",
+          "date": "2026-11-15",
+          "description": "Endurance-focused autumn base arc toward the late-season gravel event."
+        },
+        "order": 2,
+        "sessionId": "ses2026w01sat",
+        "week": 1,
+        "day": "Sat",
+        "sessionDate": "2026-09-05",
+        "sessionName": "W1_LongRide",
+        "modality": "ride",
+        "totalDurationMin": 240,
+        "effortZone": "Z1-Z2"
+      }
+    },
+    {
+      "entity_type": "prescription",
+      "key_components": { "arc_id": "autumn_base", "session_id": "ses2026w04tue" },
+      "effective_at": "2026-09-22",
+      "statement": "W4 Tue over-unders: 6x(3 min 88-92% / 3 min 103-107%), 135 min total",
+      "details": {
+        "blockName": "autumn_base",
+        "subBlock": "build",
+        "goal": {
+          "event": "Gravel 200",
+          "date": "2026-11-15",
+          "description": "Endurance-focused autumn base arc toward the late-season gravel event."
+        },
+        "order": 3,
+        "sessionId": "ses2026w04tue",
+        "week": 4,
+        "day": "Tue",
+        "sessionDate": "2026-09-22",
+        "sessionName": "W4_Overunders",
+        "modality": "ride",
+        "totalDurationMin": 135,
+        "warmup": { "powerLowPct": 40, "powerHighPct": 65 },
+        "cooldown": { "powerLowPct": 35, "powerHighPct": 45 },
+        "intervals": [
+          {
+            "durationMin": 3,
+            "powerLowPct": 88,
+            "powerHighPct": 92,
+            "count": 6,
+            "recoveryMin": 0
+          },
+          {
+            "durationMin": 3,
+            "powerLowPct": 103,
+            "powerHighPct": 107,
+            "count": 6,
+            "recoveryMin": 8,
+            "recoveryPowerLowPct": 45,
+            "recoveryPowerHighPct": 55
+          }
+        ]
+      }
+    },
+    {
+      "entity_type": "prescription",
+      "key_components": { "arc_id": "autumn_base", "session_id": "ses2026w05sat" },
+      "effective_at": "2026-10-03",
+      "statement": "W5 Sat long ride on gravel terrain, 270 min in Z1-Z2",
+      "details": {
+        "blockName": "autumn_base",
+        "subBlock": "build",
+        "goal": {
+          "event": "Gravel 200",
+          "date": "2026-11-15",
+          "description": "Endurance-focused autumn base arc toward the late-season gravel event."
+        },
+        "order": 4,
+        "sessionId": "ses2026w05sat",
+        "week": 5,
+        "day": "Sat",
+        "sessionDate": "2026-10-03",
+        "sessionName": "W5_LongRideGravel",
+        "modality": "gravel_ride",
+        "totalDurationMin": 270,
+        "effortZone": "Z1-Z2"
+      }
+    }
+  ],
+  "events": [
+    {
+      "entity_type": "consultation",
+      "statement": "Arc kickoff: athlete confirmed Gravel 200 target, weekend-long-ride capacity of up to 4.5 hours, and a hard stop for work travel in week 3.",
+      "effective_at": "2026-08-23",
+      "action_targets": ["ses2026w01tue", "ses2026w01sat", "ses2026w04tue", "ses2026w05sat"],
+      "details": {
+        "title": "Autumn base arc kickoff",
+        "summary": "Goal, calendar constraints, and time budget captured during set-goal Phase 2; week 3 volume absorbed midweek instead of the weekend."
+      }
+    }
+  ],
+  "report_claims": [
+    {
+      "entity_type": "arc-conclusion",
+      "statement": "The autumn_base arc prioritizes durable aerobic volume over early intensity because the goal event is duration-limited, not power-limited.",
+      "effective_at": "2026-08-23",
+      "source_document": "{coaching_docs_dir}/2026/autumn_base/arc-overview.md",
+      "key_components": {
+        "entity_type": "prescription",
+        "arc_id": "autumn_base",
+        "session_id": "ses2026w01tue"
+      },
+      "details": {
+        "arc": "autumn_base",
+        "sub_blocks": ["base", "build"],
+        "success_signal": "CTL reaches the low 70s by late October without TSB crashes below -15"
+      }
+    },
+    {
+      "entity_type": "methodology-conclusion",
+      "statement": "The base sub-block uses two structured sub-threshold sessions per week because the athlete's history shows sub-LT2 work sustains CTL gains without knee flare-ups.",
+      "effective_at": "2026-08-23",
+      "source_document": "{coaching_docs_dir}/2026/autumn_base/base-methodology.md",
+      "key_components": {
+        "entity_type": "prescription",
+        "arc_id": "autumn_base",
+        "session_id": "ses2026w01tue"
+      },
+      "details": {
+        "arc": "autumn_base",
+        "sub_block": "base"
+      }
+    },
+    {
+      "entity_type": "methodology-conclusion",
+      "statement": "The build sub-block introduces over-under work only after week 3's travel disruption so the first intensity block lands on a recovered athlete.",
+      "effective_at": "2026-08-23",
+      "source_document": "{coaching_docs_dir}/2026/autumn_base/build-methodology.md",
+      "key_components": {
+        "entity_type": "prescription",
+        "arc_id": "autumn_base",
+        "session_id": "ses2026w04tue"
+      },
+      "details": {
+        "arc": "autumn_base",
+        "sub_block": "build"
+      }
+    }
+  ]
+}

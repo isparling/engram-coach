@@ -85,6 +85,15 @@ describe("explicit structured capture reconciliation matrix", () => {
     ]);
   });
 
+  it("scopes a candidate to the host-selected space rather than the pack id", async () => {
+    const space = await createSyntheticCaptureSpace("athlete-training");
+    spaces.push(space);
+    const result = await previewStructuredCapture(makeChangeSet(), testPreviewTools(space));
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.candidate.scope.space).toBe("athlete-training");
+  });
+
   it("emits no mutations for an equivalent value (no-change)", async () => {
     const space = await freshSpace();
     await writeRecord(space, makeActiveStateRecord({
@@ -304,5 +313,100 @@ describe("explicit structured capture reconciliation matrix", () => {
     expect(left.planHash).toBe(right.planHash);
     expect(left.candidate.id).toBe(right.candidate.id);
     expect(left.changes).toEqual(right.changes);
+  });
+
+  it("classifies a re-import differing ONLY in nested key order as no-change", async () => {
+    // Record serialization may reorder object keys at ANY depth. Canonical
+    // comparison must sort keys recursively, so an identical re-import whose
+    // nested objects arrive in a different byte order stays `no-change`
+    // instead of raising state_conflict (array order stays significant).
+    const space = await freshSpace();
+    await writeRecord(space, makeActiveStateRecord({
+      details: {
+        recordRole: "state",
+        entityType: "prescription",
+        entityKey: "prescription:arc-a:workout-7f8c",
+        effectiveAt: "2026-08-25",
+        sourceId: "legacy:migration:state:0",
+        value: {
+          session: { cooldown: "10 min Z2", intervals: [{ power: 285, seconds: 480 }], warmup: "10 min Z1" },
+          totalMin: 75,
+        },
+        artifact: { kind: "prescription", relativePath: "prescriptions/arc-a.yaml" },
+        captureChannel: "explicit",
+      },
+    }));
+    const changeSet = makeChangeSet();
+    changeSet.state_changes[0].details = {
+      totalMin: 75,
+      session: { warmup: "10 min Z1", intervals: [{ power: 285, seconds: 480 }], cooldown: "10 min Z2" },
+    };
+    changeSet.state_changes[0].effective_at = "2026-08-25";
+    const preview = await previewIn(space, changeSet);
+    expect(preview.status).toBe("ready");
+    if (preview.status !== "ready") return;
+    expect(preview.changes).toEqual([]);
+  });
+
+  it("still classifies a genuine nested VALUE difference as a same-time conflict", async () => {
+    // The recursive canonicalization must not become comparison-blind: a
+    // changed nested value at the same effective time remains blocked.
+    const space = await freshSpace();
+    await writeRecord(space, makeActiveStateRecord({
+      details: {
+        recordRole: "state",
+        entityType: "prescription",
+        entityKey: "prescription:arc-a:workout-7f8c",
+        effectiveAt: "2026-08-25",
+        sourceId: "legacy:migration:state:0",
+        value: {
+          session: { intervals: [{ power: 285, seconds: 480 }], warmup: "10 min Z1" },
+          totalMin: 75,
+        },
+        artifact: { kind: "prescription", relativePath: "prescriptions/arc-a.yaml" },
+        captureChannel: "explicit",
+      },
+    }));
+    const changeSet = makeChangeSet();
+    changeSet.state_changes[0].details = {
+      totalMin: 75,
+      session: { warmup: "15 min Z1", intervals: [{ power: 285, seconds: 480 }] },
+    };
+    changeSet.state_changes[0].effective_at = "2026-08-25";
+    const preview = await previewIn(space, changeSet);
+    expect(preview.status).toBe("blocked");
+    if (preview.status !== "blocked") return;
+    expect(preview.errors.some((error) => error.code === "state_conflict")).toBe(true);
+  });
+
+  it("treats a reordered intervals ARRAY as a real difference, not a no-change", async () => {
+    // Array order is meaningful (intervals are a sequence): reordering the
+    // sequence must never canonicalize to the existing state.
+    const space = await freshSpace();
+    await writeRecord(space, makeActiveStateRecord({
+      details: {
+        recordRole: "state",
+        entityType: "prescription",
+        entityKey: "prescription:arc-a:workout-7f8c",
+        effectiveAt: "2026-08-25",
+        sourceId: "legacy:migration:state:0",
+        value: {
+          session: { intervals: [{ seconds: 300 }, { seconds: 480 }] },
+          totalMin: 75,
+        },
+        artifact: { kind: "prescription", relativePath: "prescriptions/arc-a.yaml" },
+        captureChannel: "explicit",
+      },
+    }));
+    const changeSet = makeChangeSet();
+    changeSet.state_changes[0].details = {
+      totalMin: 75,
+      session: { intervals: [{ seconds: 480 }, { seconds: 300 }] },
+    };
+    changeSet.state_changes[0].effective_at = "2026-08-25";
+    const preview = await previewIn(space, changeSet);
+    expect(preview.status).toBe("blocked");
+    if (preview.status !== "blocked") return;
+    expect(preview.errors.some((error) => error.code === "state_conflict")).toBe(true);
   });
 });

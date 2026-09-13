@@ -169,8 +169,14 @@ Open `.engram-coach/config.json` and replace the placeholder values:
     "default": {
       "active_persona": "conservative",
       "coaching_docs_dir": "~/REPLACE_WITH_YOUR_COACHING_DOCS_PATH",
-      "prescriptions_dir": "~/REPLACE_WITH_YOUR_PRESCRIPTIONS_PATH"
+      "prescriptions_dir": "~/REPLACE_WITH_YOUR_PRESCRIPTIONS_PATH",
+      "season": "REPLACE_WITH_SEASON_LABEL"
     }
+  },
+  "capture": {
+    "model": "REPLACE_WITH_PROVIDER/MODEL",
+    "timeout_seconds": 60,
+    "max_candidates_per_turn": 3
   }
 }
 ```
@@ -183,13 +189,25 @@ Open `.engram-coach/config.json` and replace the placeholder values:
 | `active_persona` | One of: `conservative`, `aggressive`, `polarized`, `volume` |
 | `coaching_docs_dir` | Absolute path (~ supported) to where coaching records will be written and read. Create the directory if needed: `mkdir -p ~/coaching` |
 | `prescriptions_dir` | Absolute path to your workout prescriptions directory |
+| `capture.model` | **Required.** Explicit `provider/model` string used for ambient conversation capture (e.g. `anthropic/claude-sonnet-4-5`). Never inherited from the interactive session model. |
+| `capture.timeout_seconds` | Headless extraction deadline in seconds. Default and maximum: `60`. |
+| `capture.max_candidates_per_turn` | Candidate records per settled turn. Default and maximum: `3`. |
+
+**Capture model precedence:** a nonblank `ENGRAM_COACH_CAPTURE_MODEL`
+environment variable overrides **only** `capture.model`; the timeout and
+candidate limits always come from the `capture` block. If neither source is
+set, ambient capture fails as a configuration error — run `intake` (Phase 3C)
+or edit the config rather than leaving it unset. There is no implicit fallback
+to any session or default model.
 
 **Verify config**
 
-Run this check from your athlete repo to confirm no placeholder paths remain:
+Run this check from your athlete repo to confirm no placeholder paths remain and
+a capture model is configured (a nonblank `ENGRAM_COACH_CAPTURE_MODEL` also
+satisfies the model check):
 
 ```
-python3 -c "import json; d=json.load(open('.engram-coach/config.json')); assert '~/REPLACE' not in str(d), 'Placeholder paths still present — edit .engram-coach/config.json'; print('config OK')"
+python3 -c "import json,os; d=json.load(open('.engram-coach/config.json')); assert '~/REPLACE' not in str(d), 'Placeholder paths still present — edit .engram-coach/config.json'; assert str(d.get('capture',{}).get('model','')).strip() or os.environ.get('ENGRAM_COACH_CAPTURE_MODEL','').strip(), 'capture.model missing — run intake Phase 3C or see SETUP.md'; print('config OK')"
 ```
 
 Should print `config OK`.
@@ -309,17 +327,125 @@ export ENGRAM_BINDING_REGISTRY=<absolute-path-to-registry.json>
 export ENGRAM_SPACE_ID=<space-id>
 ```
 
+**The space binding's `write_roots` must authorize both
+`coaching_docs_dir` and `prescriptions_dir`**, not only the records
+directory. Generated compatibility views are ordinary artifact writes, and
+the core confines every artifact write to an active write root. If those two
+directories are unauthorized, an approved capture still commits its records
+and refreshes the index, but every view lands in the apply result's
+`artifacts.stale` with `root_not_writable`, and the YAML and Markdown on disk
+stay at their previous contents. Re-running `engram_capture_apply` with the
+same committed hash after widening `write_roots` retries only materialization.
+
 At each awaited OMP `session_stop`, the extension imports the binding-selected
 pack and calls its optional `captureFromTurn` handler. `engram-coach` turns new
 coaching observations into create-only `status: "candidate"` draft records and
 refreshes the active space's scoped qmd index. Drafts remain excluded from
 recall and all profile renders until explicitly reviewed and promoted to
-`status: "active"`. A pack without this handler retains the generic
-`engram capture-from-turn` CLI fallback.
+`status: "active"`. Extraction is LLM-only through the configured capture
+model — a failed or missing extraction emits a visible warning and creates no
+draft.
+
+During a turn, the agent can commit structured changes through two typed
+tools: `engram_capture_preview({ change_set })` returns the exact mutation
+plan bound to an immutable plan hash, and `engram_capture_apply({ plan_hash })`
+commits that exact plan after the athlete approves the hash. `engram_status`
+reports pending plan hashes and index freshness at any time. See §7 for the
+authority model these tools enforce.
 
 ---
 
-## 7. Verification
+## 7. Knowledge Records, Generated Views, and Migration
+
+### Authority model
+
+Engram active records are the authoritative store for mutable coaching state
+and chronological events. Every pack record declares a role in
+`details.recordRole`, exactly one of:
+
+- `state` — one current value for a canonical entity key; an approved change
+  creates a new active record, retires the prior one, and links them via
+  `relationships.supersedes`.
+- `event` — append-only history (consultations, monitoring entries); never
+  automatically replaced.
+- `report-claim` — a structured conclusion extracted from an approved
+  long-form report; it never replaces the report document.
+
+Canonical entity keys are derived by the pack, never accepted from a model:
+
+```text
+workout:<session-id>
+prescription:<arc-id>:<session-id>
+threshold:<sport>:lt1
+threshold:<sport>:lt2
+persona:<active-profile>
+monitoring:<concern-id>:<signal>
+```
+
+Workout identity is the durable `session_id`; `session_date`, titles, week
+position, and workout contents are mutable attributes, not identity. Existing
+prescriptions without stable IDs receive them during migration, and rescheduling
+preserves the ID.
+
+**Generated compatibility views** — the prescription YAML files,
+`consultations.md`, monitoring logs, and doctor-prep summaries — are rendered
+deterministically from committed records after every approved apply. Each
+carries a byte-exact warning header (`# GENERATED FROM ENGRAM ACTIVE RECORDS.
+DO NOT EDIT DIRECTLY.` in YAML; `<!-- GENERATED FROM ENGRAM ACTIVE RECORDS.
+DO NOT EDIT DIRECTLY. -->` in Markdown) and is **never edited directly**:
+direct edits are overwritten by the next materialization and break migration
+comparisons. **Canonical approved documents** remain skill-authored long-form
+files: `RACE_REPORT.md`, block `SUMMARY.md`, `SEASON_REVIEW.md`, methodology
+documents, and arc-overview documents.
+
+### Approval ordering and retry semantics
+
+Skills that change records follow one ordering: preview records → athlete
+approves the exact plan hash → apply → guarded qmd refresh → regenerate
+compatibility views.
+
+- A **stale apply** (the underlying records changed since preview) deletes the
+  pending plan and requires a fresh preview plus fresh approval. The old hash
+  can never be re-applied.
+- An **`index-stale` status** means the qmd refresh failed or is outdated;
+  the committed records remain authoritative either way, and only the index
+  needs a later refresh.
+- A **stale view** (materialization failed after commit) leaves the commit in
+  place. Re-calling `engram_capture_apply` with the same committed hash in the
+  same session reruns only view regeneration — never the record mutations.
+
+### Dry-run migration sequence
+
+Legacy workspaces migrate through four modes of
+`analysis-tools/migrate-structured-capture.ts` (run from the installed plugin's
+`analysis-tools/` directory). Everything is dry-run except `apply-baseline`,
+which writes only planned stable-ID insertions and warning headers:
+
+```sh
+# 1. Plan stable session IDs + generated headers for every legacy
+#    prescription and compatibility log. Prints plan JSON; mutates nothing.
+npx tsx migrate-structured-capture.ts scan --config .engram-coach/config.json > scan.json
+
+# 2. Apply ONLY the planned ID insertions and warning headers. Refuses when
+#    the aggregate hash mismatches or any file drifted since the scan.
+npx tsx migrate-structured-capture.ts apply-baseline --plan scan.json --expect <after-hash>
+
+# 3. Plan the legacy import (prescription states + consultation events) into
+#    a StructuredChangeSet for preview/approval. Mutates nothing.
+npx tsx migrate-structured-capture.ts emit-change-set --config .engram-coach/config.json --output change-set.json
+
+# 4. Render the record-derived views into a temporary root and byte-compare
+#    them against the current source files. Exit 0 requires byte equality.
+npx tsx migrate-structured-capture.ts compare --config .engram-coach/config.json --render-root /tmp/migration-render
+```
+
+Migration is idempotent: stable source IDs prevent duplicate imports, and the
+cutover to record authority happens only once step 4 reports byte-equivalent
+generated views.
+
+---
+
+## 8. Verification
 
 Run these checks to confirm the complete setup is working before invoking a skill.
 
@@ -366,7 +492,7 @@ All six checks passing means you are ready to invoke a skill.
 
 ---
 
-## 8. Persistent Coaching Docs
+## 9. Persistent Coaching Docs
 
 Once you've run a few skills, your `coaching_docs_dir` will accumulate these documents:
 
@@ -384,7 +510,7 @@ Once you've run a few skills, your `coaching_docs_dir` will accumulate these doc
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 **`/engram-coach:intake` not appearing in Claude Code autocomplete**
 Confirm the skill files exist in the installed plugin cache:

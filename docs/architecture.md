@@ -30,6 +30,46 @@ Skills generate Markdown records in the configured coaching workspace, including
 
 `config.json`, `.env`, generated data, and athlete-specific coaching directories are local-only. `.gitignore` excludes these runtime artifacts. Public examples use placeholders and synthetic values only.
 
+## Structured capture integration contract
+
+These are the load-bearing seams between this pack and the Engram host
+(`@isparling/engram-omp` + `@isparling/engram-cli`).
+
+**Artifact pointers are pack-derived and root-relative-with-prefix.** A
+prescription state record always carries `details.artifact.relativePath` of
+`prescriptions/<arc-id>.yaml`; the skill does not choose it. Both
+`computeDesiredViews` and `analysis-tools/migrate-structured-capture.ts`
+resolve that pointer by *stripping* the leading `prescriptions/` segment and
+rooting the remainder at `prescriptions_dir`. Appending the pointer to the
+configured root instead produces `<prescriptions_dir>/prescriptions/...` and a
+byte-comparison failure against the migrated baseline. Non-prescription kinds
+root their pointer unchanged at `coaching_docs_dir`. `DesiredView.absoluteTarget`
+is the single authoritative resolution: consumers use it rather than re-deriving
+the mapping.
+
+**Candidate scope comes from the host, not the pack.** The host passes the
+active space id on the preview tools; the aggregate candidate's
+`scope.space` is that value. A pack that substitutes its own id produces
+envelopes the host rejects with `field_invalid` on `scope.space`.
+
+**Generated views are ordinary artifact writes.** The space binding's
+`write_roots` must authorize `coaching_docs_dir` and `prescriptions_dir`. If
+they do not, an approved capture still commits records and refreshes the
+index, while every view is reported in `artifacts.stale` with
+`root_not_writable`. Re-applying the same committed hash retries only
+materialization.
+
+**Change-set field contract.** `source.turn_id` is a non-negative integer,
+not a string. Every `events[]` item requires an `action_targets` array of
+single-line strings (use `[]` when nothing is targeted); `state_changes[]`
+items must not carry one — the pack derives `[]` for them.
+
+**Dependency resolution.** A Bun-compiled OMP cannot resolve bare
+dependencies from a pack module imported after extension startup, so
+`engram-coach-materialization.ts` loads `yaml` through `createRequire`, then
+falls back to an upward search anchored on the dependency's own
+`package.json`.
+
 ## Test commands
 
 Run the tools suite with:

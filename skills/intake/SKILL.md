@@ -190,6 +190,23 @@ Write the skeleton YAML to the specified path. Note the prescriptions directory 
 
 ---
 
+### Phase 3C — Capture Model
+
+Ask: **"Which provider/model should ambient conversation capture use?"**
+(e.g., `anthropic/claude-sonnet-4-5`, `openai/gpt-5-mini` — an explicit
+`provider/model` string.)
+
+This model runs the separate headless extraction pass after each settled turn.
+It is independent of the interactive session model and is never inherited from
+it. If the athlete has no preference, recommend a small, inexpensive model:
+extraction emits concise atomic candidate records, not coaching reasoning.
+
+Record the exact `provider/model` string for Phase 4. Ambient capture cannot
+run without it: if neither this value nor the `ENGRAM_COACH_CAPTURE_MODEL`
+environment variable is configured, capture fails as a configuration error.
+
+---
+
 ### Phase 4 — Configure
 
 Assemble the `config.json` content using values collected during intake:
@@ -205,9 +222,20 @@ Assemble the `config.json` content using values collected during intake:
       "prescriptions_dir": "{prescriptions-path}",
       "season": "{season-label}"
     }
+  },
+  "capture": {
+    "model": "{provider/model from Phase 3C}",
+    "timeout_seconds": 60,
+    "max_candidates_per_turn": 3
   }
 }
 ```
+
+For `capture`: write the exact `provider/model` string collected in Phase 3C
+and exactly `timeout_seconds: 60` and `max_candidates_per_turn: 3`. The
+`ENGRAM_COACH_CAPTURE_MODEL` environment variable, when set nonblank, overrides
+**only** `capture.model`; the timeout and candidate limit always come from this
+block.
 
 For `season`: derive from the goal date (e.g., "May 2, 2026" → `"2026"`). If no date was given, ask: **"What season label should I use for coaching records?"** (e.g., `"2026"`, `"2026-spring"`)
 
@@ -279,6 +307,7 @@ Output the completion summary:
 Persona:         {slug}
 Goal:            {goal event} — {date}
 Prescription:    {prescriptions_dir}
+Capture model:  {provider/model}
 Coaching docs:   {coaching_docs_dir}
 Intake record:   {coaching_docs_dir}/{season}/intake.md
 

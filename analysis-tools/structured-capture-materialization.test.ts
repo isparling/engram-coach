@@ -405,6 +405,36 @@ describe("materialize", () => {
     }
   });
 
+  it("roots canonical prescription paths exactly once", async () => {
+    const tools = toolsFor([
+      makeRecord({
+        role: "state",
+        entityType: "prescription",
+        effectiveAt: "2026-08-20",
+        sourceId: "s-root:1:explicit:0",
+        artifactKind: "prescription",
+        relativePath: "prescriptions/smoke.yaml",
+        value: {
+          blockName: "smoke",
+          order: 0,
+          sessionId: "workout-smoke",
+          week: 1,
+          day: "Mon",
+          sessionDate: "2026-08-24",
+          sessionName: "Smoke_Endurance",
+        },
+      }),
+    ]);
+
+    await materialize(plan, tools, options);
+
+    expect(tools.calls).toHaveLength(1);
+    expect(tools.calls[0]).toMatchObject({
+      root: "/proj/prescriptions",
+      relativePath: "smoke.yaml",
+    });
+  });
+
   it("groups records by artifact relativePath: separate paths split, shared paths merge", async () => {
     const session = (order: number, sessionId: string, sessionName: string) =>
       makeRecord({
