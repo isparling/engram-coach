@@ -70,6 +70,21 @@ dependencies from a pack module imported after extension startup, so
 falls back to an upward search anchored on the dependency's own
 `package.json`.
 
+**Pack identity version is not the npm version.** `engramCoachPackVersion`
+is a provenance and compatibility identifier, and the core compares it by
+exact equality in three places: space registration requires the manifest's
+`required_packs` version to equal the binding's `installed_packs` version
+(no semver ranges); a candidate envelope's `pack` must match an installed
+pack and the loaded pack object; and every planned mutation must preserve the
+pack provenance of the record it rewrites. Because a supersede retires the
+prior record by re-emitting that record — carrying the `pack` stamp it was
+written with — raising `engramCoachPackVersion` while records exist on disk
+at the old value makes reconciliation refuse the supersede with
+`provenance_mismatch`. Changing it is therefore a record migration, never a
+release chore: publishing a new npm version of this package leaves the pack
+identity version alone, and `installed_packs[].version` keeps naming the pack
+identity rather than the npm release.
+
 ## Test commands
 
 Run the tools suite with:

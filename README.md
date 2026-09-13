@@ -65,6 +65,12 @@ one up through your own Engram deployment, then add the pack declaration:
 }
 ```
 
+That `version` is the pack identity exported as `engramCoachPackVersion`, not
+the npm release version — they move independently, and the identity version
+changes only alongside a record migration. See
+[`SETUP.md`](SETUP.md#6-install-the-plugin) and
+[`docs/architecture.md`](docs/architecture.md).
+
 **Set `ENGRAM_BINDING_REGISTRY`** to the absolute path of that binding
 registry file before starting OMP. It is required, not optional: without it
 the adapter disables knowledge capture entirely for the whole session. See

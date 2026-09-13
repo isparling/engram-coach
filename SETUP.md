@@ -316,6 +316,15 @@ This package documents only the pack declaration to add:
 }
 ```
 
+`version` here is the **pack identity** version exported by the package as
+`engramCoachPackVersion`, not the npm release version of
+`@isparling/engram-coach`. The two are deliberately independent: the core
+matches pack identity by exact equality and refuses any mutation that would
+change the pack provenance of an existing record, so the identity version
+only ever changes together with a record migration. Keep `0.1.0` here even
+when you install a newer npm release, and make your space manifest's
+`required_packs` entry carry that same identity version.
+
 **Set `ENGRAM_BINDING_REGISTRY`** to the absolute path of that binding
 registry file before starting OMP. It is required, not optional: without it
 the adapter logs a warning at session start and disables knowledge capture
