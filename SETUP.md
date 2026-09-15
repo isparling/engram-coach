@@ -277,19 +277,19 @@ Restart Claude Code. Type `/engram-coach` — all ten skills should appear:
 
 ### Alternative: Direct OMP integration
 
-Instead of (or in addition to) the Claude Code plugin, `engram-coach` can be
-loaded directly into OMP as an Engram external pack, without the plugin layer:
+Instead of (or in addition to) the Claude Code plugin, install `engram-coach`
+and the Engram adapter directly through OMP:
 
 ```sh
-npm install @isparling/engram-coach @isparling/engram-harness @isparling/engram-cli @isparling/engram-omp
+omp install @isparling/engram-omp @isparling/engram-coach
 ```
 
-Bind the OMP extension:
-
-```yaml
-extensions:
-  - ./node_modules/@isparling/engram-omp/omp-extension.ts
-```
+The adapter brings its CLI runtime dependency, OMP installs the shared harness
+peer, and the adapter extension is discovered from its package manifest. For
+an explicit project-local npm installation instead, install the same two
+packages with `npm install` and add
+`./node_modules/@isparling/engram-omp/omp-extension.ts` to OMP's `extensions`
+list.
 
 The adapter does not read coaching plugin state and does not choose a pack:
 the active binding's `installed_packs` declaration does that. A complete Engram

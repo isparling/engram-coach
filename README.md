@@ -34,16 +34,14 @@ You can define a custom policy with [`PERSONA_SCHEMA.md`](PERSONA_SCHEMA.md).
 
 Follow [`SETUP.md`](SETUP.md) to install the plugin, configure Intervals.icu access, and create a local coaching workspace.
 
-For direct OMP integration, install the published Engram packages and bind the OMP extension:
+For direct OMP integration, install the published adapter and coach pack:
 
 ```sh
-npm install @isparling/engram-coach @isparling/engram-harness @isparling/engram-cli @isparling/engram-omp
+omp install @isparling/engram-omp @isparling/engram-coach
 ```
 
-```yaml
-extensions:
-  - ./node_modules/@isparling/engram-omp/omp-extension.ts
-```
+The adapter brings its CLI dependency, OMP installs the shared harness peer,
+and the adapter extension is discovered from its package manifest.
 
 This does not include core Engram onboarding. The OMP extension resolves
 `engram-coach` through an **existing Engram binding registry** whose `training`
