@@ -27,6 +27,7 @@ import {
   planMarkdownLogBaseline,
   planPrescriptionBaseline,
   planPrescriptionImport,
+  readConsultationSources,
   scanBaseline,
 } from "../engram-coach-migration.ts";
 import { computeDesiredViews } from "../engram-coach-materialization.ts";
@@ -186,6 +187,80 @@ describe("hash-bound baseline application", () => {
       const secondOutcome = await applyBaseline(secondScan, secondScan.afterHash);
       expect(secondOutcome.written).toEqual([]);
       expect(await readFile(sandbox.prescriptionPath, "utf8")).toBe(PRESCRIPTION_WITH_IDS);
+    } finally {
+      await sandbox.destroy();
+    }
+  });
+
+  it("discovers every nested consultation log in deterministic relative-path order", async () => {
+    const sandbox = await createMigrationSandbox({ withConsultations: false });
+    try {
+      const relativePaths = [
+        "2026/transition/consultations.md",
+        "2026/base/consultations.md",
+        "2026/Zeta/consultations.md",
+        "2026/alpha/consultations.md",
+      ];
+      for (const relativePath of relativePaths) {
+        const absolutePath = join(sandbox.coachingDocsDir, relativePath);
+        await mkdir(dirname(absolutePath), { recursive: true });
+        await writeFile(absolutePath, CONSULTATIONS_BEFORE, "utf8");
+      }
+
+      const scan = await scanBaseline(sandboxRoots(sandbox));
+      expect(
+        scan.files
+          .filter((entry) => entry.rootKind === "coaching-docs")
+          .map((entry) => entry.plan.relativePath),
+      ).toEqual([
+        "2026/Zeta/consultations.md",
+        "2026/alpha/consultations.md",
+        "2026/base/consultations.md",
+        "2026/transition/consultations.md",
+      ]);
+    } finally {
+      await sandbox.destroy();
+    }
+  });
+
+  it("propagates traversal errors instead of silently omitting a subtree", async () => {
+    const sandbox = await createMigrationSandbox({ withConsultations: false });
+    try {
+      const notDirectory = join(sandbox.root, "not-a-directory");
+      await writeFile(notDirectory, "content", "utf8");
+      await expect(readConsultationSources(notDirectory)).rejects.toMatchObject({
+        code: "ENOTDIR",
+      });
+    } finally {
+      await sandbox.destroy();
+    }
+  });
+
+  it("gives registry-declared monitoring artifacts precedence over filename discovery", async () => {
+    const sandbox = await createMigrationSandbox({ withConsultations: false });
+    try {
+      const relativePath = "monitoring/consultations.md";
+      const absolutePath = join(sandbox.coachingDocsDir, relativePath);
+      const registryPath = join(sandbox.coachingDocsDir, "tracking", "concerns.yaml");
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await mkdir(dirname(registryPath), { recursive: true });
+      await writeFile(absolutePath, CONSULTATIONS_BEFORE, "utf8");
+      await writeFile(
+        registryPath,
+        [
+          "concerns:",
+          "  - id: overlap",
+          "    active: true",
+          `    log: ${relativePath}`,
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+
+      const scan = await scanBaseline(sandboxRoots(sandbox));
+      expect(
+        scan.files.filter((entry) => entry.plan.relativePath === relativePath),
+      ).toHaveLength(1);
     } finally {
       await sandbox.destroy();
     }
@@ -438,6 +513,125 @@ describe("migration CLI", () => {
     );
     for (const mode of ["scan", "apply-baseline", "emit-change-set", "compare"]) {
       expect(stdout).toContain(mode);
+    }
+  });
+
+  it("emits consultation events from nested consultation logs", async () => {
+    const sandbox = await createMigrationSandbox({ withConsultations: false });
+    const toolDir = new URL(".", import.meta.url).pathname;
+    const configPath = join(sandbox.root, "config.json");
+    const outputPath = join(sandbox.root, "change-sets.json");
+    const consultationPath = join(
+      sandbox.coachingDocsDir,
+      "2026",
+      "base",
+      "consultations.md",
+    );
+    const config = {
+      active_profile: "default",
+      profiles: {
+        default: {
+          active_persona: "conservative",
+          coaching_docs_dir: sandbox.coachingDocsDir,
+          prescriptions_dir: sandbox.prescriptionsDir,
+        },
+      },
+      capture: {
+        model: "synthetic/capture-model",
+        timeout_seconds: 60,
+        max_candidates_per_turn: 3,
+      },
+    };
+
+    try {
+      await mkdir(dirname(consultationPath), { recursive: true });
+      await writeFile(consultationPath, CONSULTATIONS_BEFORE, "utf8");
+      await writeFile(configPath, JSON.stringify(config), "utf8");
+      await execFileAsync(
+        process.execPath,
+        [
+          "node_modules/tsx/dist/cli.mjs",
+          "migrate-structured-capture.ts",
+          "emit-change-set",
+          "--config",
+          configPath,
+          "--output",
+          outputPath,
+        ],
+        { cwd: toolDir },
+      );
+
+      const changeSets = JSON.parse(
+        await readFile(outputPath, "utf8"),
+      ) as StructuredChangeSet[];
+      const consultation = changeSets.find((changeSet) =>
+        changeSet.events.some((event) =>
+          String(event.details.legacyMarkdown).includes(
+            "Fatigue flagged after race; scheduled down week.",
+          ),
+        ),
+      );
+      expect(consultation).toBeDefined();
+    } finally {
+      await sandbox.destroy();
+    }
+  });
+
+  it("never imports a registry-declared monitoring artifact as a consultation", async () => {
+    const sandbox = await createMigrationSandbox({ withConsultations: false });
+    const toolDir = new URL(".", import.meta.url).pathname;
+    const configPath = join(sandbox.root, "config.json");
+    const outputPath = join(sandbox.root, "overlap-change-sets.json");
+    const relativePath = "monitoring/consultations.md";
+    const declaredPath = join(sandbox.coachingDocsDir, relativePath);
+    const registryPath = join(sandbox.coachingDocsDir, "tracking", "concerns.yaml");
+    const config = {
+      active_profile: "default",
+      profiles: {
+        default: {
+          active_persona: "conservative",
+          coaching_docs_dir: sandbox.coachingDocsDir,
+          prescriptions_dir: sandbox.prescriptionsDir,
+        },
+      },
+      capture: {
+        model: "synthetic/capture-model",
+        timeout_seconds: 60,
+        max_candidates_per_turn: 3,
+      },
+    };
+
+    try {
+      await mkdir(dirname(declaredPath), { recursive: true });
+      await mkdir(dirname(registryPath), { recursive: true });
+      await writeFile(declaredPath, MONITORING_BEFORE, "utf8");
+      await writeFile(
+        registryPath,
+        ["concerns:", "  - id: overlap", "    active: true", `    log: ${relativePath}`, ""].join("\n"),
+        "utf8",
+      );
+      await writeFile(configPath, JSON.stringify(config), "utf8");
+      await execFileAsync(
+        process.execPath,
+        [
+          "node_modules/tsx/dist/cli.mjs",
+          "migrate-structured-capture.ts",
+          "emit-change-set",
+          "--config",
+          configPath,
+          "--output",
+          outputPath,
+        ],
+        { cwd: toolDir },
+      );
+
+      const changeSets = JSON.parse(await readFile(outputPath, "utf8")) as StructuredChangeSet[];
+      const consultationEvents = changeSets.flatMap((changeSet) =>
+        changeSet.events.filter((event) => event.entity_type === "consultation"),
+      );
+      expect(consultationEvents).toEqual([]);
+    } finally {
+      await sandbox.destroy();
     }
   });
 
@@ -767,10 +961,13 @@ describe("legacy import end-to-end coverage", () => {
     };
   }
 
-  function consultationChangeSet(text: string): StructuredChangeSet {
+  function consultationChangeSet(
+    text: string,
+    relativePath = "coaching/consultations.md",
+  ): StructuredChangeSet {
     const [changeSet] = planLegacyImport({
       prescriptions: [],
-      consultations: [{ relativePath: "coaching/consultations.md", text }],
+      consultations: [{ relativePath, text }],
     });
     if (changeSet === undefined) throw new Error("consultation import produced no change set");
     return changeSet;
@@ -804,9 +1001,13 @@ describe("legacy import end-to-end coverage", () => {
   async function runConsultationImport(
     space: SyntheticCaptureSpace,
     text: string,
+    relativePath = "coaching/consultations.md",
   ): Promise<ReadyCapturePreview> {
     const tools = testPreviewTools(space);
-    const preview = await previewStructuredCapture(consultationChangeSet(text), tools);
+    const preview = await previewStructuredCapture(
+      consultationChangeSet(text, relativePath),
+      tools,
+    );
     if (preview.status !== "ready") throw new Error(`preview blocked: ${JSON.stringify(preview.errors)}`);
     const applied = await approvedApply(space, tools, preview);
     if (applied.status !== "committed") throw new Error(`apply did not commit: ${applied.status}`);
@@ -826,7 +1027,7 @@ describe("legacy import end-to-end coverage", () => {
       { config: endToEndConfig(space.root) },
     );
     expect(materialization.stale).toEqual([]);
-    expect(materialization.written.map((entry) => entry.path)).toContain("coaching/consultations.md");
+    expect(materialization.written.map((entry) => entry.path)).toContain(relativePath);
     return preview;
   }
 
@@ -841,6 +1042,43 @@ describe("legacy import end-to-end coverage", () => {
       const config = endToEndConfig(space.root);
       const regenerated = await readFile(join(config.coachingDocsDir, "coaching", "consultations.md"), "utf8");
       expect(regenerated).toBe(planMarkdownLogBaseline("coaching/consultations.md", CONSULTATIONS_BEFORE).afterText);
+    } finally {
+      await space.destroy();
+    }
+  });
+
+  it("materializes a nested consultation import back to its discovered path", async () => {
+    const space = await createSyntheticCaptureSpace();
+    const relativePath = "2026/base/consultations.md";
+    try {
+      await runConsultationImport(space, CONSULTATIONS_BEFORE, relativePath);
+      const config = endToEndConfig(space.root);
+      const regenerated = await readFile(
+        join(config.coachingDocsDir, relativePath),
+        "utf8",
+      );
+      expect(regenerated).toBe(
+        planMarkdownLogBaseline(relativePath, CONSULTATIONS_BEFORE).afterText,
+      );
+    } finally {
+      await space.destroy();
+    }
+  });
+
+  it("blocks an event whose compatibility path escapes the artifact root", async () => {
+    const space = await createSyntheticCaptureSpace();
+    try {
+      const changeSet = consultationChangeSet(CONSULTATIONS_BEFORE);
+      const escaping = {
+        ...changeSet,
+        events: changeSet.events.map((event) => ({
+          ...event,
+          details: { ...event.details, compatibility_path: "../escape.md" },
+        })),
+      };
+      const preview = await previewStructuredCapture(escaping, testPreviewTools(space));
+      expect(preview.status).toBe("blocked");
+      expect(JSON.stringify(preview)).toContain("compatibility_path");
     } finally {
       await space.destroy();
     }

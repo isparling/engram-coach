@@ -33,6 +33,7 @@ import {
   migrationActiveRecords,
   planLegacyImport,
   readConcernRegistry,
+  readConsultationSources,
   scanBaseline,
   MigrationError,
   type BaselineRoots,
@@ -115,19 +116,9 @@ async function readSources(roots: BaselineRoots): Promise<{
     });
   }
   const candidates = new Set<string>(Object.values(monitoringConcernLogPaths));
-  const consultations: Array<{ relativePath: string; text: string }> = [];
-  try {
-    consultations.push({
-      relativePath: "coaching/consultations.md",
-      text: await readFile(join(roots.coachingDocsDir, "coaching/consultations.md"), "utf8"),
-    });
-  } catch {
-    // No legacy consultation log — nothing to import.
-  }
   // Monitoring: every declared concern log plus any generated shared view
   // under monitoring/ (Doctor-Prep summaries are derived output, never
   // imported).
-  const monitoring: Array<{ relativePath: string; text: string }> = [];
   try {
     for (const name of await readdir(join(roots.coachingDocsDir, "monitoring"))) {
       if (/\.md$/.test(name) && !/^doctor-prep/i.test(name)) candidates.add(`monitoring/${name}`);
@@ -135,6 +126,13 @@ async function readSources(roots: BaselineRoots): Promise<{
   } catch {
     // No monitoring directory — nothing to import.
   }
+  // Monitoring ownership is resolved BEFORE consultation discovery so a
+  // monitoring artifact named consultations.md is imported once, as
+  // monitoring, instead of also becoming a consultation event.
+  const consultations = await readConsultationSources(roots.coachingDocsDir, {
+    reservedPaths: candidates,
+  });
+  const monitoring: Array<{ relativePath: string; text: string }> = [];
   for (const relativePath of [...candidates].sort()) {
     const text = await readFile(join(roots.coachingDocsDir, relativePath), "utf8").catch(() => null);
     if (text !== null) monitoring.push({ relativePath, text });

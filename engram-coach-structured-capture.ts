@@ -311,6 +311,8 @@ function validateEvent(
   const details = jsonObject(raw, "details", `${field}.details`, errors);
   const actionTargets = stringArray(raw, "action_targets", `${field}.action_targets`, errors);
   if (statement === null || effectiveAt === null) return null;
+  const artifact = eventArtifact(entityType as EventEntityType, details, field, errors);
+  if (artifact === null) return null;
   const sourceId = `${sessionId}:${turnId}:event:${index}`;
   return {
     sourceId,
@@ -321,13 +323,48 @@ function validateEvent(
     effectiveAt,
     statement,
     value: details,
-    artifact: eventArtifact(entityType as EventEntityType),
+    artifact,
     actionTargets,
     sourceDocument: null,
   };
 }
 
-function eventArtifact(entityType: EventEntityType): CaptureArtifactRef {
+/**
+ * A change set may route an event to the compatibility artifact it came
+ * from via `details.compatibility_path` — the legacy migration uses it so a
+ * nested consultation log regenerates at its own path instead of collapsing
+ * every log into one canonical file. The path must stay inside the artifact
+ * root: absolute paths, traversal segments, and backslashes are refused
+ * rather than normalized, so a bad path can never write outside the root.
+ */
+function eventArtifact(
+  entityType: EventEntityType,
+  details: JsonObject,
+  field: string,
+  errors: KnowledgeError[],
+): CaptureArtifactRef | null {
+  const fallback = defaultEventArtifact(entityType);
+  const declared = details["compatibility_path"];
+  if (declared === undefined) return fallback;
+  if (typeof declared !== "string" || !isRootRelativePath(declared)) {
+    errors.push(validationError(
+      "change_set_field_invalid",
+      `${field}.details.compatibility_path`,
+      `${field}.details.compatibility_path must be a root-relative path without traversal segments`,
+    ));
+    return null;
+  }
+  return { kind: fallback.kind, relativePath: declared };
+}
+
+/** Root-contained relative path: no absolute root, no `.`/`..`, no backslash. */
+function isRootRelativePath(value: string): boolean {
+  if (value.length === 0 || value.startsWith("/") || value.includes("\\")) return false;
+  if (value.includes("//")) return false;
+  return !value.split("/").some((segment) => segment === "" || segment === "." || segment === "..");
+}
+
+function defaultEventArtifact(entityType: EventEntityType): CaptureArtifactRef {
   switch (entityType) {
     case "consultation":
       return { kind: "consultation", relativePath: "coaching/consultations.md" };

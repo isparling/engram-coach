@@ -452,6 +452,14 @@ Migration is idempotent: stable source IDs prevent duplicate imports, and the
 cutover to record authority happens only once step 4 reports byte-equivalent
 generated views.
 
+Consultation logs are discovered recursively: every `consultations.md` below
+`coaching_docs_dir` is planned at its own relative path (for example
+`2026/base/consultations.md`), and each regenerates back to that same path
+rather than collapsing into one canonical file. A path declared in
+`tracking/concerns.yaml` belongs to the monitoring migration and is never
+also imported as a consultation. A traversal failure under the coaching root
+aborts the scan instead of silently planning an incomplete corpus.
+
 ---
 
 ## 8. Verification

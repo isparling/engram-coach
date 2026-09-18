@@ -17,6 +17,7 @@
  * @module engram-coach-migration
  */
 
+import type { Dirent } from "node:fs";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -203,7 +204,6 @@ export type BaselineScan = {
   files: Array<{ rootKind: "prescriptions" | "coaching-docs"; plan: BaselineFilePlan }>;
 };
 
-const CONSULTATION_LOG_RELATIVE_PATH = "coaching/consultations.md";
 
 async function readIfExists(path: string): Promise<string | null> {
   try {
@@ -211,6 +211,91 @@ async function readIfExists(path: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export type ConsultationSource = {
+  relativePath: string;
+  text: string;
+};
+
+const CONSULTATION_LOG_FILENAME = "consultations.md";
+
+/** Node errno code, when the thrown value carries one. */
+function errnoCode(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("code" in error)) return null;
+  const code = error.code;
+  return typeof code === "string" ? code : null;
+}
+
+/**
+ * Recursively reads every consultation log below the coaching docs root.
+ *
+ * An absent root is a clean no-op; every other traversal failure propagates,
+ * so a permission or I/O error can never present an incomplete corpus as a
+ * complete migration. Symlinked entries are skipped rather than followed,
+ * which keeps traversal free of cycles and root escapes.
+ *
+ * `reservedPaths` yields ownership to a caller that already claims a path —
+ * registry-declared monitoring artifacts — so one file is never planned
+ * twice under two entity types.
+ */
+export async function readConsultationSources(
+  coachingDocsDir: string,
+  options: { reservedPaths?: ReadonlySet<string> } = {},
+): Promise<ConsultationSource[]> {
+  const reserved = options.reservedPaths ?? new Set<string>();
+  const sources: ConsultationSource[] = [];
+
+  async function visit(absoluteDir: string, relativeDir: string): Promise<void> {
+    let entries: Dirent[];
+    try {
+      entries = await readdir(absoluteDir, { withFileTypes: true });
+    } catch (error) {
+      if (errnoCode(error) === "ENOENT") return;
+      throw error;
+    }
+
+    for (const entry of entries) {
+      const relativePath =
+        relativeDir.length === 0 ? entry.name : `${relativeDir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        await visit(join(absoluteDir, entry.name), relativePath);
+        continue;
+      }
+      if (
+        !entry.isFile() ||
+        entry.name !== CONSULTATION_LOG_FILENAME ||
+        reserved.has(relativePath)
+      ) {
+        continue;
+      }
+      const text = await readIfExists(join(absoluteDir, entry.name));
+      if (text !== null) sources.push({ relativePath, text });
+    }
+  }
+
+  await visit(coachingDocsDir, "");
+  // Code-unit ordering, not locale collation: the plan order and its
+  // aggregate hash must be identical on every host.
+  sources.sort((left, right) =>
+    left.relativePath < right.relativePath ? -1 : left.relativePath > right.relativePath ? 1 : 0,
+  );
+  return sources;
+}
+
+/** Relative paths the monitoring migration owns: declared logs and summaries. */
+function monitoringOwnedPaths(
+  declarations: readonly MonitoringConcernDeclaration[],
+): string[] {
+  return [
+    ...new Set(
+      declarations.flatMap((declaration) =>
+        [declaration.logPath, declaration.doctorPrepPath].filter(
+          (path): path is string => path !== null,
+        ),
+      ),
+    ),
+  ].sort();
 }
 
 /**
@@ -231,27 +316,23 @@ export async function scanBaseline(roots: BaselineRoots): Promise<BaselineScan> 
     if (text === null) continue;
     files.push({ rootKind: "prescriptions", plan: planPrescriptionBaseline(name, text) });
   }
-  const consultations = await readIfExists(join(roots.coachingDocsDir, CONSULTATION_LOG_RELATIVE_PATH));
-  if (consultations !== null) {
+  // Monitoring ownership is resolved BEFORE consultation discovery so a
+  // declared artifact named consultations.md is planned once, as monitoring.
+  const declarations = await readConcernRegistry(roots.coachingDocsDir);
+  const monitoringPaths = monitoringOwnedPaths(declarations);
+  const consultations = await readConsultationSources(roots.coachingDocsDir, {
+    reservedPaths: new Set(monitoringPaths),
+  });
+  for (const source of consultations) {
     files.push({
       rootKind: "coaching-docs",
-      plan: planMarkdownLogBaseline(CONSULTATION_LOG_RELATIVE_PATH, consultations),
+      plan: planMarkdownLogBaseline(source.relativePath, source.text),
     });
   }
 
   // Registry-driven monitoring artifacts join the SAME hash-bound baseline
   // plan: every declared concern log and Doctor-Prep Summary gets the
   // generated header (header-only, content untouched) before cutover.
-  const declarations = await readConcernRegistry(roots.coachingDocsDir);
-  const monitoringPaths = [
-    ...new Set(
-      declarations.flatMap((declaration) =>
-        [declaration.logPath, declaration.doctorPrepPath].filter(
-          (path): path is string => path !== null,
-        ),
-      ),
-    ),
-  ].sort();
   for (const relativePath of monitoringPaths) {
     const text = await readIfExists(join(roots.coachingDocsDir, relativePath));
     if (text === null) continue;
@@ -541,7 +622,11 @@ export function planConsultationImport(relativePath: string, text: string): Stru
         effective_at: earliestDateIn(content),
         statement: "Legacy consultation history imported verbatim",
         action_targets: [],
-        details: { legacyMarkdown: content, sourcePath: relativePath },
+        details: {
+          legacyMarkdown: content,
+          sourcePath: relativePath,
+          compatibility_path: relativePath,
+        },
       },
     ];
   }
@@ -552,7 +637,11 @@ export function planConsultationImport(relativePath: string, text: string): Stru
     const effectiveAt = !Number.isNaN(Date.parse(firstToken)) ? firstToken : earliestDateIn(lines.slice(start, end).join("\n"));
     const remainder = headingRest.slice(firstToken.length).replace(/^\s*[—-]\s*/, "").trim();
     const body = lines.slice(start + 1, end).join("\n").replace(/^\n/, "").trimEnd();
-    const value: JsonObject = { legacyMarkdown: body.length > 0 ? body : headingRest, sourcePath: relativePath };
+    const value: JsonObject = {
+      legacyMarkdown: body.length > 0 ? body : headingRest,
+      sourcePath: relativePath,
+      compatibility_path: relativePath,
+    };
     if (remainder.length > 0 && remainder !== headingRest) value.title = remainder;
     return {
       entity_type: "consultation",
