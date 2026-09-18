@@ -30,7 +30,7 @@ import {
   readConsultationSources,
   scanBaseline,
 } from "../engram-coach-migration.ts";
-import { computeDesiredViews } from "../engram-coach-materialization.ts";
+import { computeDesiredViews, renderPrescriptionView } from "../engram-coach-materialization.ts";
 import { previewStructuredCapture } from "../engram-coach-structured-capture.ts";
 import {
   createSyntheticCaptureSpace,
@@ -38,8 +38,10 @@ import {
 } from "./structured-capture-test-support.ts";
 
 import type { KnowledgeEnvelope, KnowledgeRecord } from "@isparling/engram-harness/knowledge-types";
+import type { JsonObject } from "@isparling/engram-harness/knowledge-types";
 import { readdir } from "node:fs/promises";
 import { dirname } from "node:path";
+import { parse as parseYaml } from "yaml";
 import { parseKnowledgeRecord } from "../../engram/harness/src/knowledgeRecord.ts";
 import type {
   ReadyCapturePreview,
@@ -57,6 +59,7 @@ const FIXTURE_DIR = new URL("./fixtures/structured-capture/migration/", import.m
 const PRESCRIPTION_BEFORE = await readFile(join(FIXTURE_DIR, "prescription-before.yaml"), "utf8");
 const PRESCRIPTION_WITH_IDS = await readFile(join(FIXTURE_DIR, "prescription-with-ids.yaml"), "utf8");
 const CONSULTATIONS_BEFORE = await readFile(join(FIXTURE_DIR, "consultations-before.md"), "utf8");
+const PRESCRIPTION_RICH = await readFile(join(FIXTURE_DIR, "prescription-rich-before.yaml"), "utf8");
 
 type MigrationSandbox = {
   root: string;
@@ -1201,5 +1204,99 @@ describe("legacy import end-to-end coverage", () => {
     } finally {
       await space.destroy();
     }
+  });
+
+  it("carries unmodeled document, session, and interval fields into the imported record", () => {
+    const changes = planPrescriptionImport("rich_block.yaml", PRESCRIPTION_RICH);
+    const first = changes[0]?.details;
+    if (typeof first !== "object" || first === null || Array.isArray(first)) {
+      throw new Error("prescription value is not an object");
+    }
+    expect(first.documentFields).toEqual({
+      block_start: "2026-02-16",
+      block_end: "2026-03-15",
+    });
+    expect(first.extraFields).toEqual({
+      note: "Hold the low end if cadence drops below 85 rpm.",
+      above_ftp_cap_min: 0,
+    });
+    const intervals = first.intervals;
+    if (!Array.isArray(intervals)) throw new Error("intervals missing");
+    const [firstInterval, secondInterval] = intervals as JsonObject[];
+    expect(firstInterval?.extraFields).toEqual({ baseline_zone: "Z1" });
+    // A watts-only band keeps its values and never gains invented pct keys.
+    expect(secondInterval?.extraFields).toEqual({
+      power_low_watts: 210,
+      power_high_watts: 225,
+    });
+    expect("powerLowPct" in (secondInterval ?? {})).toBe(false);
+    // An explicit null is preserved as null, distinct from an absent key.
+    expect(secondInterval?.recoveryMin).toBeNull();
+  });
+
+  it("renders a rich prescription back to semantic and comment parity", () => {
+    const [changeSet] = planLegacyImport({
+      prescriptions: [{ relativePath: "rich_block.yaml", text: PRESCRIPTION_RICH }],
+    });
+    if (changeSet === undefined) throw new Error("rich import produced no change set");
+    const records = migrationActiveRecords(changeSet);
+    const appliedAt = records
+      .map((record) => record.submittedAt)
+      .reduce((latest, at) => (at > latest ? at : latest));
+    const { views } = computeDesiredViews(records, appliedAt, "/synthetic/docs", "/synthetic/prescriptions");
+    const view = views.find((entry) => entry.relativePath.endsWith("rich_block.yaml"));
+    if (view === undefined) throw new Error(`no rich prescription view: ${views.map((v) => v.relativePath).join(", ")}`);
+    const body = view.content.replace(GENERATED_PRESCRIPTION_HEADER, "");
+
+    // Every datum survives: same parsed document, nulls and watts included.
+    expect(parseYaml(body)).toEqual(parseYaml(PRESCRIPTION_RICH));
+    // Every comment survives, including the leading rationale block.
+    for (const comment of PRESCRIPTION_RICH.split("\n").filter((line) => line.trimStart().startsWith("#"))) {
+      expect(body.split("\n").map((line) => line.trimEnd())).toContain(comment.trimEnd());
+    }
+  });
+
+  it("preserves blank-line separation so a regenerated block stays readable", () => {
+    const [changeSet] = planLegacyImport({
+      prescriptions: [{ relativePath: "rich_block.yaml", text: PRESCRIPTION_RICH }],
+    });
+    if (changeSet === undefined) throw new Error("rich import produced no change set");
+    const records = migrationActiveRecords(changeSet);
+    const appliedAt = records
+      .map((record) => record.submittedAt)
+      .reduce((latest, at) => (at > latest ? at : latest));
+    const { views } = computeDesiredViews(records, appliedAt, "/synthetic/docs", "/synthetic/prescriptions");
+    const view = views.find((entry) => entry.relativePath.endsWith("rich_block.yaml"));
+    if (view === undefined) throw new Error("no rich prescription view");
+    const body = view.content.replace(GENERATED_PRESCRIPTION_HEADER, "");
+    const blankLines = (text: string): number => text.split("\n").filter((line) => line.trim().length === 0).length;
+    expect(blankLines(body)).toBe(blankLines(PRESCRIPTION_RICH));
+  });
+
+  it("preserves source key order so regenerated diffs stay readable", () => {
+    const [changeSet] = planLegacyImport({
+      prescriptions: [{ relativePath: "rich_block.yaml", text: PRESCRIPTION_RICH }],
+    });
+    if (changeSet === undefined) throw new Error("rich import produced no change set");
+    const records = migrationActiveRecords(changeSet);
+    const appliedAt = records
+      .map((record) => record.submittedAt)
+      .reduce((latest, at) => (at > latest ? at : latest));
+    const { views } = computeDesiredViews(records, appliedAt, "/synthetic/docs", "/synthetic/prescriptions");
+    const view = views.find((entry) => entry.relativePath.endsWith("rich_block.yaml"));
+    if (view === undefined) throw new Error("no rich prescription view");
+    const body = view.content.replace(GENERATED_PRESCRIPTION_HEADER, "");
+
+    const sessionKeys = (text: string): string[][] =>
+      (parseYaml(text) as { sessions: Array<Record<string, unknown>> }).sessions.map((session) =>
+        Object.keys(session),
+      );
+    const intervalKeys = (text: string): string[][] =>
+      (parseYaml(text) as { sessions: Array<{ intervals?: Array<Record<string, unknown>> }> }).sessions
+        .flatMap((session) => session.intervals ?? [])
+        .map((interval) => Object.keys(interval));
+    expect(Object.keys(parseYaml(body) as object)).toEqual(Object.keys(parseYaml(PRESCRIPTION_RICH) as object));
+    expect(sessionKeys(body)).toEqual(sessionKeys(PRESCRIPTION_RICH));
+    expect(intervalKeys(body)).toEqual(intervalKeys(PRESCRIPTION_RICH));
   });
 });

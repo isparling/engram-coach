@@ -22,7 +22,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
-import type { YAMLMap } from "yaml";
+import type { Document, YAMLMap, YAMLSeq } from "yaml";
 import type { JsonObject, JsonValue } from "@isparling/engram-harness/knowledge-types";
 import {
   SCHEMA_VERSION,
@@ -476,6 +476,197 @@ function toJsonValue(value: unknown, ancestors: Set<object> = new Set()): JsonVa
   }
 }
 
+/** Keys PRESCRIPTION_FORMAT.md models; every other key round-trips verbatim. */
+const MODELED_DOCUMENT_KEYS: ReadonlySet<string> = new Set(["block_name", "goal", "sessions"]);
+const MODELED_SESSION_KEYS: ReadonlySet<string> = new Set([
+  "session_id", "week", "day", "session_date", "session_name", "modality",
+  "total_duration_min", "effort_zone", "goal",
+  "warmup_power_low_pct", "warmup_power_high_pct",
+  "cooldown_power_low_pct", "cooldown_power_high_pct", "intervals",
+]);
+const MODELED_INTERVAL_KEYS: ReadonlySet<string> = new Set([
+  "duration_min", "power_low_pct", "power_high_pct", "count", "recovery_min",
+  "recovery_power_low_pct", "recovery_power_high_pct",
+]);
+
+/**
+ * Unmodeled keys in source order, converted verbatim.
+ *
+ * Real authoring routinely exceeds PRESCRIPTION_FORMAT.md — fueling targets,
+ * absolute-watt bands, above-FTP caps, prose notes, block date ranges.
+ * Carrying them into the record keeps the knowledge base complete and lets
+ * the materializer render them back, instead of deleting them at cutover.
+ */
+function unmodeledFields(
+  raw: { [key: string]: unknown },
+  modeled: ReadonlySet<string>,
+): JsonObject | null {
+  const extra: JsonObject = {};
+  for (const [key, entry] of Object.entries(raw)) {
+    if (modeled.has(key)) continue;
+    const converted = toJsonValue(entry);
+    if (converted !== undefined) extra[key] = converted;
+  }
+  return Object.keys(extra).length > 0 ? extra : null;
+}
+
+/**
+ * Records a modeled numeric only when the source carried the key, so an
+ * explicit `recovery_min: null` — a continuous effort with no rep recovery —
+ * stays distinguishable from an absent field and renders back unchanged.
+ */
+function numberIfPresent(
+  value: JsonObject,
+  targetKey: string,
+  raw: { [key: string]: unknown },
+  sourceKey: string,
+): void {
+  if (!Object.hasOwn(raw, sourceKey)) return;
+  value[targetKey] = asNumber(raw[sourceKey]);
+}
+
+/**
+ * Comment text as the yaml AST stores it: no leading `#`, newline-joined.
+ *
+ * The generated header is dropped from every slot it can land in. Without a
+ * blank line before the first key, the parser attaches a file's whole leading
+ * block to that key rather than to the document, so filtering here — at the
+ * single capture chokepoint — is what keeps regeneration from stacking a new
+ * header on every pass.
+ */
+function commentText(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0) return null;
+  return withoutGeneratedHeader(value);
+}
+
+/** True when the yaml AST recorded a blank line before this node. */
+function hasSpaceBefore(node: unknown): boolean {
+  return typeof node === "object" && node !== null && "spaceBefore" in node
+    ? node.spaceBefore === true
+    : false;
+}
+
+/** Before/inline comments and blank-line flags for one map's keys. */
+function mapComments(node: unknown): {
+  before: JsonObject | null;
+  inline: JsonObject | null;
+  spaced: JsonObject | null;
+} {
+  const before: JsonObject = {};
+  const inline: JsonObject = {};
+  const spaced: JsonObject = {};
+  if (isMap(node)) {
+    for (const pair of node.items) {
+      if (!isScalar(pair.key)) continue;
+      const key = String(pair.key.value);
+      const keyBefore = commentText(pair.key.commentBefore);
+      if (keyBefore !== null) before[key] = keyBefore;
+      // A trailing comment may attach to the key or to a scalar value
+      // depending on spacing; either way it belongs to this key.
+      const trailing = isScalar(pair.value)
+        ? commentText(pair.value.comment) ?? commentText(pair.key.comment)
+        : commentText(pair.key.comment);
+      if (trailing !== null) inline[key] = trailing;
+      if (hasSpaceBefore(pair.key)) spaced[key] = true;
+    }
+  }
+  return {
+    before: Object.keys(before).length > 0 ? before : null,
+    inline: Object.keys(inline).length > 0 ? inline : null,
+    spaced: Object.keys(spaced).length > 0 ? spaced : null,
+  };
+}
+
+/**
+ * Source key order for one map. The renderer emits in this order so
+ * unmodeled fields stay where the athlete wrote them, instead of being
+ * appended after the modeled ones and reordering every diff.
+ */
+function mapKeyOrder(node: unknown): JsonValue | null {
+  if (!isMap(node)) return null;
+  const keys = node.items
+    .filter((pair) => isScalar(pair.key))
+    .map((pair) => String((pair.key as { value: unknown }).value));
+  return keys.length > 0 ? keys : null;
+}
+
+/** Comments and blank-line separation owned by one node and its keys. */
+function presentationOf(node: unknown): JsonObject | null {
+  const presentation: JsonObject = {};
+  if (isMap(node) || isSeq(node)) {
+    const before = commentText(node.commentBefore);
+    if (before !== null) presentation.comment = before;
+    const inline = commentText(node.comment);
+    if (inline !== null) presentation.inlineComment = inline;
+  }
+  if (hasSpaceBefore(node)) presentation.spaceBefore = true;
+  const { before: fieldComments, inline: fieldInlineComments, spaced } = mapComments(node);
+  if (fieldComments !== null) presentation.fieldComments = fieldComments;
+  if (fieldInlineComments !== null) presentation.fieldInlineComments = fieldInlineComments;
+  if (spaced !== null) presentation.fieldSpaceBefore = spaced;
+  const order = mapKeyOrder(node);
+  if (order !== null) presentation.keyOrder = order;
+  return Object.keys(presentation).length > 0 ? presentation : null;
+}
+
+/**
+ * Document-scoped comments: the leading rationale block, any trailing
+ * comment, top-level key comments, and the banner that sits between
+ * `sessions:` and the first session item.
+ */
+function documentPresentationOf(doc: Document, contents: unknown): JsonObject | null {
+  const presentation: JsonObject = {};
+  const leading = commentText(doc.commentBefore);
+  if (leading !== null) presentation.comment = leading;
+  const trailing = commentText(doc.comment);
+  if (trailing !== null) presentation.trailingComment = trailing;
+  const { before, inline, spaced } = mapComments(contents);
+  if (before !== null) presentation.fieldComments = before;
+  if (inline !== null) presentation.fieldInlineComments = inline;
+  if (spaced !== null) presentation.fieldSpaceBefore = spaced;
+  const documentOrder = mapKeyOrder(contents);
+  if (documentOrder !== null) presentation.keyOrder = documentOrder;
+  const sessionsNode = sessionsSeqOf(contents);
+  if (sessionsNode !== null) {
+    const seqBefore = commentText(sessionsNode.commentBefore);
+    if (seqBefore !== null) presentation.sessionsComment = seqBefore;
+    const seqInline = commentText(sessionsNode.comment);
+    if (seqInline !== null) presentation.sessionsInlineComment = seqInline;
+    if (hasSpaceBefore(sessionsNode)) presentation.sessionsSpaceBefore = true;
+  }
+  return Object.keys(presentation).length > 0 ? presentation : null;
+}
+
+/** The generated header as the yaml AST stores a comment: no leading `#`. */
+const GENERATED_HEADER_COMMENT = GENERATED_PRESCRIPTION_HEADER.replace(/^#/, "").replace(/\n$/, "");
+
+/**
+ * Drops the materializer's own generated-header line from a captured leading
+ * comment. The renderer prepends that header itself, so keeping it would
+ * duplicate the line on every regeneration pass.
+ */
+function withoutGeneratedHeader(comment: string | null): string | null {
+  if (comment === null) return null;
+  const kept = comment.split("\n").filter((line) => line !== GENERATED_HEADER_COMMENT);
+  while (kept.length > 0 && (kept[0] ?? "").trim().length === 0) kept.shift();
+  const text = kept.join("\n");
+  return text.trim().length > 0 ? text : null;
+}
+
+/** The `sessions` sequence node, when the document has one. */
+function sessionsSeqOf(contents: unknown): YAMLSeq | null {
+  if (!isMap(contents)) return null;
+  const node: unknown = contents.get("sessions", true);
+  return isSeq(node) ? node : null;
+}
+
+/** The `intervals` sequence items of one session node, in source order. */
+function intervalNodesOf(sessionNode: unknown): readonly unknown[] {
+  if (!isMap(sessionNode)) return [];
+  const node: unknown = sessionNode.get("intervals", true);
+  return isSeq(node) ? node.items : [];
+}
+
 /**
  * Converts one parsed legacy session into the camelCase materializer value
  * shape (`details.value`), carrying provenance metadata alongside.
@@ -484,6 +675,11 @@ function sessionValue(
   raw: { [key: string]: unknown },
   meta: { arcId: string; sessionId: string; order: number; relativePath: string },
   docMeta: { blockName: string; goal: JsonValue | null },
+  source: {
+    node: unknown;
+    documentFields: JsonObject | null;
+    documentPresentation: JsonObject | null;
+  },
 ): JsonObject {
   const value: JsonObject = {
     blockName: docMeta.blockName,
@@ -509,29 +705,41 @@ function sessionValue(
   const cooldown = powerBandField(raw.cooldown_power_low_pct, raw.cooldown_power_high_pct);
   if (cooldown !== null) value.cooldown = cooldown;
   if (Array.isArray(raw.intervals)) {
-    value.intervals = raw.intervals.map((interval) => intervalValue(interval));
+    const intervalNodes = intervalNodesOf(source.node);
+    value.intervals = raw.intervals.map((interval, index) =>
+      intervalValue(interval, intervalNodes[index]),
+    );
   }
+  const extraFields = unmodeledFields(raw, MODELED_SESSION_KEYS);
+  if (extraFields !== null) value.extraFields = extraFields;
+  if (source.documentFields !== null) value.documentFields = source.documentFields;
+  if (source.documentPresentation !== null) value.documentPresentation = source.documentPresentation;
+  const presentation = presentationOf(source.node);
+  if (presentation !== null) value.presentation = presentation;
   value.artifactRelativePath = meta.relativePath;
   value.sourcePath = meta.relativePath;
   return value;
 }
 
-function intervalValue(raw: unknown): JsonObject {
+function intervalValue(raw: unknown, node: unknown): JsonObject {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
   const interval = raw as { [key: string]: unknown };
-  const value: JsonObject = {
-    durationMin: asNumber(interval.duration_min),
-    powerLowPct: asNumber(interval.power_low_pct),
-    powerHighPct: asNumber(interval.power_high_pct),
-    count: asNumber(interval.count),
-    recoveryMin: asNumber(interval.recovery_min),
-  };
+  const value: JsonObject = {};
+  numberIfPresent(value, "durationMin", interval, "duration_min");
+  numberIfPresent(value, "powerLowPct", interval, "power_low_pct");
+  numberIfPresent(value, "powerHighPct", interval, "power_high_pct");
+  numberIfPresent(value, "count", interval, "count");
+  numberIfPresent(value, "recoveryMin", interval, "recovery_min");
   if (asNumber(interval.recovery_power_low_pct) !== null) {
     value.recoveryPowerLowPct = interval.recovery_power_low_pct as number;
   }
   if (asNumber(interval.recovery_power_high_pct) !== null) {
     value.recoveryPowerHighPct = interval.recovery_power_high_pct as number;
   }
+  const extraFields = unmodeledFields(interval, MODELED_INTERVAL_KEYS);
+  if (extraFields !== null) value.extraFields = extraFields;
+  const presentation = presentationOf(node);
+  if (presentation !== null) value.presentation = presentation;
   return value;
 }
 
@@ -565,6 +773,10 @@ export function planPrescriptionImport(relativePath: string, text: string): Stru
     throw new MigrationError(`${relativePath}: no sessions list`);
   }
   const arcId = arcIdFor(relativePath);
+  const contents: unknown = doc.contents;
+  const sessionNodes = sessionsSeqOf(contents)?.items ?? [];
+  const documentFields = unmodeledFields(parsed, MODELED_DOCUMENT_KEYS);
+  const documentPresentation = documentPresentationOf(doc, contents);
   return rawSessions.map((rawUnknown, index): StructuredStateChange => {
     if (typeof rawUnknown !== "object" || rawUnknown === null || Array.isArray(rawUnknown)) {
       throw new MigrationError(`${relativePath}: session ${index} is not a mapping`);
@@ -582,10 +794,15 @@ export function planPrescriptionImport(relativePath: string, text: string): Stru
       key_components: { arc_id: arcId, session_id: sessionId },
       effective_at: effectiveAt,
       statement,
-      details: sessionValue(raw, { arcId, sessionId, order: index, relativePath }, {
-        blockName: singleLine(blockName ?? arcId),
-        goal: typeof parsed.goal === "object" && parsed.goal !== null ? (parsed.goal as JsonValue) : null,
-      }),
+      details: sessionValue(
+        raw,
+        { arcId, sessionId, order: index, relativePath },
+        {
+          blockName: singleLine(blockName ?? arcId),
+          goal: typeof parsed.goal === "object" && parsed.goal !== null ? (parsed.goal as JsonValue) : null,
+        },
+        { node: sessionNodes[index], documentFields, documentPresentation },
+      ),
     };
   });
 }

@@ -1,0 +1,67 @@
+# Rich block — exercises every field and comment the record round-trip must keep.
+#
+# Volume targets:
+#   Week 1: ~10hr   Week 2: ~12hr
+#
+# Power zone reference:
+#   Z1/Z2 endurance : 56-75% FTP
+#   Sweet Spot      : 88-93% FTP
+
+block_name: rich_block
+block_start: "2026-02-16"
+block_end: "2026-03-15"
+
+goal:
+  event: Synthetic Gravel Classic
+  date: "2026-05-02"
+
+sessions:
+
+  # ===========================================================================
+  # WEEK 1 — introduces structured work
+  # ===========================================================================
+
+  # Week 1 | Tuesday | Sub-LT2 intervals
+  - session_id: workout-rich-subLT2
+    week: 1
+    day: Tue
+    session_date: 2026-02-17
+    session_name: W1_SubLT2
+    total_duration_min: 90
+    note: Hold the low end if cadence drops below 85 rpm.
+    above_ftp_cap_min: 0
+    warmup_power_low_pct: 40
+    warmup_power_high_pct: 65
+    # 3 × 12min @ 85-93% FTP, 5min recovery
+    intervals:
+      - duration_min: 12
+        power_low_pct: 85
+        power_high_pct: 93
+        count: 3
+        recovery_min: 5
+        baseline_zone: Z1
+      # Absolute-watt band: legacy authoring the format doc discourages.
+      - duration_min: 20
+        power_low_watts: 210
+        power_high_watts: 225
+        count: 1
+        recovery_min: null
+
+  # Week 1 | Saturday | Long endurance, continuous
+  - session_id: workout-rich-long
+    week: 1
+    day: Sat
+    session_date: 2026-02-21
+    session_name: W1_Long
+    total_duration_min: 240
+    duration_range_min: 210-270
+    plus_walk: true
+    structure: Steady Z2 with as-appropriate surges in the final hour.
+    cho_target_g_per_hr: 90
+    intervals:
+      - duration_min: 220
+        power_low_pct: 56
+        power_high_pct: 75
+        count: 1
+        recovery_min: null
+        baseline_zone: Z2

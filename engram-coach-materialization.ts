@@ -81,7 +81,8 @@ function loadYamlModule(): YamlModule {
   }
 }
 
-const { stringify: stringifyYaml } = loadYamlModule();
+const { Document: YamlDocument, isMap, isScalar, isSeq } = loadYamlModule();
+type YamlDocument = InstanceType<YamlModule["Document"]>;
 
 /** Host mechanics supplied by the OMP extension — no coaching ontology here. */
 export type MaterializeTools = {
@@ -206,14 +207,21 @@ type PrescriptionSession = {
   warmup: PowerBand;
   cooldown: PowerBand;
   intervals: Array<{
-    durationMin: number;
-    powerLowPct: number;
-    powerHighPct: number;
-    count: number;
-    recoveryMin: number;
+    present: ReadonlySet<string>;
+    durationMin: number | null;
+    powerLowPct: number | null;
+    powerHighPct: number | null;
+    count: number | null;
+    recoveryMin: number | null;
     recoveryPowerLowPct: number | null;
     recoveryPowerHighPct: number | null;
+    extraFields: { [key: string]: JsonValue } | null;
+    presentation: { [key: string]: JsonValue } | null;
   }>;
+  extraFields: { [key: string]: JsonValue } | null;
+  documentFields: { [key: string]: JsonValue } | null;
+  documentPresentation: { [key: string]: JsonValue } | null;
+  presentation: { [key: string]: JsonValue } | null;
 };
 
 function parsePowerBand(value: JsonValue | undefined): PowerBand {
@@ -245,28 +253,26 @@ function parsePrescriptionSession(value: { [key: string]: JsonValue }): Prescrip
     if (!Array.isArray(rawIntervals)) return null;
     for (const rawInterval of rawIntervals) {
       if (!isObject(rawInterval)) return null;
-      const durationMin = asNumber(rawInterval.durationMin);
-      const powerLowPct = asNumber(rawInterval.powerLowPct);
-      const powerHighPct = asNumber(rawInterval.powerHighPct);
-      const count = asNumber(rawInterval.count);
-      const recoveryMin = asNumber(rawInterval.recoveryMin);
-      if (
-        durationMin === null ||
-        powerLowPct === null ||
-        powerHighPct === null ||
-        count === null ||
-        recoveryMin === null
-      ) {
-        return null;
-      }
+      // A modeled numeric is optional and may be explicitly null: a
+      // continuous effort has no rep recovery, and a legacy watt band
+      // carries no FTP percentages. Rendering must reproduce exactly what
+      // the source had, so presence is tracked separately from value.
+      const present = new Set(
+        ["durationMin", "powerLowPct", "powerHighPct", "count", "recoveryMin"].filter(
+          (key) => rawInterval[key] !== undefined,
+        ),
+      );
       intervals.push({
-        durationMin,
-        powerLowPct,
-        powerHighPct,
-        count,
-        recoveryMin,
+        present,
+        durationMin: asNumber(rawInterval.durationMin),
+        powerLowPct: asNumber(rawInterval.powerLowPct),
+        powerHighPct: asNumber(rawInterval.powerHighPct),
+        count: asNumber(rawInterval.count),
+        recoveryMin: asNumber(rawInterval.recoveryMin),
         recoveryPowerLowPct: asNumber(rawInterval.recoveryPowerLowPct),
         recoveryPowerHighPct: asNumber(rawInterval.recoveryPowerHighPct),
+        extraFields: isObject(rawInterval.extraFields) ? rawInterval.extraFields : null,
+        presentation: isObject(rawInterval.presentation) ? rawInterval.presentation : null,
       });
     }
   }
@@ -285,16 +291,26 @@ function parsePrescriptionSession(value: { [key: string]: JsonValue }): Prescrip
     warmup: parsePowerBand(value.warmup),
     cooldown: parsePowerBand(value.cooldown),
     intervals,
+    extraFields: isObject(value.extraFields) ? value.extraFields : null,
+    documentFields: isObject(value.documentFields) ? value.documentFields : null,
+    documentPresentation: isObject(value.documentPresentation) ? value.documentPresentation : null,
+    presentation: isObject(value.presentation) ? value.presentation : null,
   };
 }
 
 /**
  * Renders the prescription YAML for one relative path from its active session
- * records. Field order follows PRESCRIPTION_FORMAT.md: block_name, goal,
- * sessions ordered by `order` then `sessionId`; within a session, week, day,
- * session_date, session_name, modality, total_duration_min, effort_zone,
- * warmup/cooldown bands, then intervals. Inconsistent blockName or goal across
- * the group is an error, never a silent pick.
+ * records. Field order follows PRESCRIPTION_FORMAT.md: block_name, document
+ * extras, goal, sessions ordered by `order` then `sessionId`; within a
+ * session, week, day, session_date, session_name, modality,
+ * total_duration_min, effort_zone, warmup/cooldown bands, session extras,
+ * then intervals. Inconsistent blockName, goal, document extras, or document
+ * comments across the group is an error, never a silent pick.
+ *
+ * Unmodeled fields and authored comments captured at import are written back,
+ * so a migrated file keeps its rationale and any authoring the format doc
+ * does not model. Comments are per-record: a skill that supersedes a session
+ * writes its own, so a stale comment can never contradict mutated data.
  */
 export function renderPrescriptionView(
   records: readonly MaterializationRecord[],
@@ -320,7 +336,21 @@ export function renderPrescriptionView(
     left.order !== right.order ? left.order - right.order : left.sessionId < right.sessionId ? -1 : left.sessionId > right.sessionId ? 1 : 0,
   );
 
+  const documentFields = new Set(sessions.map((session) => canonicalJson(session.documentFields)));
+  if (documentFields.size !== 1) {
+    return { ok: false, reason: `inconsistent documentFields across active records for ${where}` };
+  }
+  const documentPresentations = new Set(
+    sessions.map((session) => canonicalJson(session.documentPresentation)),
+  );
+  if (documentPresentations.size !== 1) {
+    return { ok: false, reason: `inconsistent documentPresentation across active records for ${where}` };
+  }
+
   const document: { [key: string]: JsonValue } = { block_name: sessions[0].blockName };
+  for (const [key, entry] of Object.entries(sessions[0].documentFields ?? {})) {
+    document[key] = entry;
+  }
   const goal = sessions[0].goal;
   if (isObject(goal)) document.goal = goal;
   document.sessions = sessions.map((session): JsonValue => {
@@ -338,26 +368,137 @@ export function renderPrescriptionView(
     if (session.warmup.highPct !== null) rendered.warmup_power_high_pct = session.warmup.highPct;
     if (session.cooldown.lowPct !== null) rendered.cooldown_power_low_pct = session.cooldown.lowPct;
     if (session.cooldown.highPct !== null) rendered.cooldown_power_high_pct = session.cooldown.highPct;
+    for (const [key, entry] of Object.entries(session.extraFields ?? {})) {
+      rendered[key] = entry;
+    }
     if (session.intervals.length > 0) {
       rendered.intervals = session.intervals.map((interval): JsonValue => {
-        const item: { [key: string]: JsonValue } = {
-          duration_min: interval.durationMin,
-          power_low_pct: interval.powerLowPct,
-          power_high_pct: interval.powerHighPct,
-          count: interval.count,
-          recovery_min: interval.recoveryMin,
-        };
+        const item: { [key: string]: JsonValue } = {};
+        if (interval.present.has("durationMin")) item.duration_min = interval.durationMin;
+        if (interval.present.has("powerLowPct")) item.power_low_pct = interval.powerLowPct;
+        if (interval.present.has("powerHighPct")) item.power_high_pct = interval.powerHighPct;
+        if (interval.present.has("count")) item.count = interval.count;
+        if (interval.present.has("recoveryMin")) item.recovery_min = interval.recoveryMin;
         if (interval.recoveryPowerLowPct !== null) item.recovery_power_low_pct = interval.recoveryPowerLowPct;
         if (interval.recoveryPowerHighPct !== null) item.recovery_power_high_pct = interval.recoveryPowerHighPct;
-        return item;
+        for (const [key, entry] of Object.entries(interval.extraFields ?? {})) {
+          item[key] = entry;
+        }
+        return orderedByKeyOrder(item, interval.presentation);
       });
     }
-    return rendered;
+    return orderedByKeyOrder(rendered, session.presentation);
   });
 
-  // yaml.stringify terminates with exactly one LF; lineWidth 0 keeps long
-  // statements unwrapped so output is stable across yaml versions.
-  return { ok: true, content: PRESCRIPTION_HEADER + stringifyYaml(document, { lineWidth: 0 }) };
+  // A yaml Document carries the comments; lineWidth 0 keeps long statements
+  // unwrapped so output is stable across yaml versions.
+  const out = new YamlDocument(
+    orderedByKeyOrder(document, sessions[0].documentPresentation),
+  );
+  applyPrescriptionComments(out, sessions);
+  return { ok: true, content: PRESCRIPTION_HEADER + out.toString({ lineWidth: 0 }) };
+}
+
+/**
+ * Reorders one rendered mapping to the key order captured at import, so
+ * unmodeled fields keep the position the athlete wrote them in. Keys with no
+ * captured position (a session_id inserted by the baseline, or a field a
+ * skill adds later) keep their canonical order at the end.
+ */
+function orderedByKeyOrder(
+  rendered: { [key: string]: JsonValue },
+  presentation: { [key: string]: JsonValue } | null,
+): { [key: string]: JsonValue } {
+  const order = presentation?.keyOrder;
+  if (!Array.isArray(order)) return rendered;
+  const wanted = order.filter((key): key is string => typeof key === "string");
+  const ordered: { [key: string]: JsonValue } = {};
+  for (const key of wanted) {
+    if (Object.hasOwn(rendered, key)) ordered[key] = rendered[key] as JsonValue;
+  }
+  for (const [key, entry] of Object.entries(rendered)) {
+    if (!Object.hasOwn(ordered, key)) ordered[key] = entry;
+  }
+  return ordered;
+}
+
+/** Reattaches captured comments and blank-line separation to the output. */
+function applyPrescriptionComments(
+  out: YamlDocument,
+  sessions: readonly PrescriptionSession[],
+): void {
+  const documentPresentation = sessions[0]?.documentPresentation ?? null;
+  const contents: unknown = out.contents;
+  if (documentPresentation !== null) {
+    const leading = asString(documentPresentation.comment);
+    if (leading !== null) out.commentBefore = leading;
+    const trailing = asString(documentPresentation.trailingComment);
+    if (trailing !== null) out.comment = trailing;
+    applyMapPresentation(
+      contents,
+      documentPresentation.fieldComments,
+      documentPresentation.fieldInlineComments,
+      documentPresentation.fieldSpaceBefore,
+    );
+  }
+  const sessionsSeq = isMap(contents) ? contents.get("sessions", true) : undefined;
+  if (!isSeq(sessionsSeq)) return;
+  if (documentPresentation !== null) {
+    const seqComment = asString(documentPresentation.sessionsComment);
+    if (seqComment !== null) sessionsSeq.commentBefore = seqComment;
+    const seqInline = asString(documentPresentation.sessionsInlineComment);
+    if (seqInline !== null) sessionsSeq.comment = seqInline;
+    if (documentPresentation.sessionsSpaceBefore === true) sessionsSeq.spaceBefore = true;
+  }
+  sessions.forEach((session, index) => {
+    const sessionNode: unknown = sessionsSeq.items[index];
+    applyNodePresentation(sessionNode, session.presentation);
+    const intervalsSeq = isMap(sessionNode) ? sessionNode.get("intervals", true) : undefined;
+    if (!isSeq(intervalsSeq)) return;
+    session.intervals.forEach((interval, intervalIndex) => {
+      applyNodePresentation(intervalsSeq.items[intervalIndex], interval.presentation);
+    });
+  });
+}
+
+/** Applies one node's own comments and spacing plus its immediate keys'. */
+function applyNodePresentation(node: unknown, presentation: { [key: string]: JsonValue } | null): void {
+  if (presentation === null) return;
+  if (isMap(node) || isSeq(node)) {
+    const before = asString(presentation.comment);
+    if (before !== null) node.commentBefore = before;
+    const inline = asString(presentation.inlineComment);
+    if (inline !== null) node.comment = inline;
+    if (presentation.spaceBefore === true) node.spaceBefore = true;
+  }
+  applyMapPresentation(
+    node,
+    presentation.fieldComments,
+    presentation.fieldInlineComments,
+    presentation.fieldSpaceBefore,
+  );
+}
+
+function applyMapPresentation(
+  node: unknown,
+  before: JsonValue | undefined,
+  inline: JsonValue | undefined,
+  spaced: JsonValue | undefined,
+): void {
+  if (!isMap(node)) return;
+  for (const pair of node.items) {
+    if (!isScalar(pair.key)) continue;
+    const key = String(pair.key.value);
+    const beforeText = isObject(before) ? asString(before[key]) : null;
+    if (beforeText !== null) pair.key.commentBefore = beforeText;
+    const inlineText = isObject(inline) ? asString(inline[key]) : null;
+    if (inlineText !== null) {
+      // Inline comments render from the value node when it is a scalar.
+      if (isScalar(pair.value)) pair.value.comment = inlineText;
+      else pair.key.comment = inlineText;
+    }
+    if (isObject(spaced) && spaced[key] === true) pair.key.spaceBefore = true;
+  }
 }
 
 // ---------------------------------------------------------------------------
