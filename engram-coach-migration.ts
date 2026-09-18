@@ -783,8 +783,8 @@ export function planPrescriptionImport(relativePath: string, text: string): Stru
     }
     const raw = rawUnknown as { [key: string]: unknown };
     const sessionId = asString(raw.session_id)?.trim() || migratedSessionId(relativePath, index);
-    const effectiveAt = asString(raw.session_date);
-    if (effectiveAt === null || Number.isNaN(Date.parse(effectiveAt))) {
+    const effectiveAt = isoDateFrom(asString(raw.session_date));
+    if (effectiveAt === null) {
       throw new MigrationError(`${relativePath}: session ${index} has no parseable session_date`);
     }
     const sessionName = singleLine(asString(raw.session_name) ?? `session ${index}`);
@@ -810,10 +810,24 @@ export function planPrescriptionImport(relativePath: string, text: string): Stru
 const EARLIEST_ISO_DATE = /\d{4}-\d{2}-\d{2}(T[\d:.]+Z)?/;
 const UNPARSEABLE_EFFECTIVE_AT = "1970-01-01";
 
+/**
+ * The bare ISO date inside a legacy token, or null.
+ *
+ * `Date.parse` is far too lenient to gate a stored date: it accepts
+ * `**2026-08-13**` and `2026-08-02 (PM)` verbatim, and it even resolves the
+ * decorated forms to a different instant than the bare form (local time
+ * versus UTC). Storing the decorated token leaves a record that cannot be
+ * compared or ordered against any other date, so every site extracts the
+ * bare date instead of trusting the token.
+ */
+function isoDateFrom(token: string | null | undefined): string | null {
+  if (typeof token !== "string") return null;
+  const match = EARLIEST_ISO_DATE.exec(token);
+  return match?.[0] ?? null;
+}
+
 function earliestDateIn(text: string): string {
-  const match = EARLIEST_ISO_DATE.exec(text);
-  const candidate = match?.[0];
-  return candidate !== undefined && !Number.isNaN(Date.parse(candidate)) ? candidate : UNPARSEABLE_EFFECTIVE_AT;
+  return isoDateFrom(text) ?? UNPARSEABLE_EFFECTIVE_AT;
 }
 
 /**
@@ -851,7 +865,7 @@ export function planConsultationImport(relativePath: string, text: string): Stru
     const end = position + 1 < headings.length ? headings[position + 1] : lines.length;
     const headingRest = singleLine(lines[start].replace(/^##\s+/, ""));
     const firstToken = headingRest.split(/\s+/)[0] ?? "";
-    const effectiveAt = !Number.isNaN(Date.parse(firstToken)) ? firstToken : earliestDateIn(lines.slice(start, end).join("\n"));
+    const effectiveAt = isoDateFrom(firstToken) ?? earliestDateIn(lines.slice(start, end).join("\n"));
     const remainder = headingRest.slice(firstToken.length).replace(/^\s*[—-]\s*/, "").trim();
     const body = lines.slice(start + 1, end).join("\n").replace(/^\n/, "").trimEnd();
     const value: JsonObject = {
@@ -1054,9 +1068,7 @@ export function planMonitoringEntries(
           const parts = remainder.split(" — ");
           push({
             role: bullet[2] === "state" ? "state" : "event",
-            effectiveAt: !Number.isNaN(Date.parse(dateToken))
-              ? dateToken
-              : earliestDateIn(line),
+            effectiveAt: isoDateFrom(dateToken) ?? earliestDateIn(line),
             concernId,
             signal,
             status: parts[0]?.length ? parts[0] : null,
@@ -1106,10 +1118,7 @@ export function planMonitoringEntries(
         const date = cellAt(dateColumn);
         push({
           role: "event",
-          effectiveAt:
-            date !== null && !Number.isNaN(Date.parse(date))
-              ? date
-              : earliestDateIn(line),
+          effectiveAt: isoDateFrom(date) ?? earliestDateIn(line),
           concernId: fallbackConcernId,
           signal: slugSignal(cellAt(signalColumn) ?? ""),
           status: cellAt(statusColumn),
@@ -1127,9 +1136,7 @@ export function planMonitoringEntries(
       const firstToken = headingRest.split(/\s+/)[0] ?? "";
       push({
         role: "event",
-        effectiveAt: !Number.isNaN(Date.parse(firstToken))
-          ? firstToken
-          : earliestDateIn(prose),
+        effectiveAt: isoDateFrom(firstToken) ?? earliestDateIn(prose),
         concernId: fallbackConcernId,
         signal: slugSignal(/signal:\s*([A-Za-z0-9 _-]+)/.exec(prose)?.[1] ?? ""),
         status: null,

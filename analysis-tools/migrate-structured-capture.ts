@@ -40,6 +40,7 @@ import {
   type BaselineScan,
 } from "../engram-coach-migration.ts";
 import { computeDesiredViews } from "../engram-coach-materialization.ts";
+import { MONITORING_EVENTS_VIEW_PATH } from "../engram-coach-structured-capture.ts";
 
 function usage(): string {
   return [
@@ -116,12 +117,16 @@ async function readSources(roots: BaselineRoots): Promise<{
     });
   }
   const candidates = new Set<string>(Object.values(monitoringConcernLogPaths));
-  // Monitoring: every declared concern log plus any generated shared view
-  // under monitoring/ (Doctor-Prep summaries are derived output, never
-  // imported).
+  // Monitoring: every declared concern log plus any athlete-authored log
+  // under monitoring/. Doctor-Prep summaries and the aggregated events view
+  // are derived output and are never imported — importing the events view
+  // would duplicate every monitoring entry on each migration run.
   try {
     for (const name of await readdir(join(roots.coachingDocsDir, "monitoring"))) {
-      if (/\.md$/.test(name) && !/^doctor-prep/i.test(name)) candidates.add(`monitoring/${name}`);
+      if (!/\.md$/.test(name)) continue;
+      if (/^doctor-prep/i.test(name)) continue;
+      if (`monitoring/${name}` === MONITORING_EVENTS_VIEW_PATH) continue;
+      candidates.add(`monitoring/${name}`);
     }
   } catch {
     // No monitoring directory — nothing to import.

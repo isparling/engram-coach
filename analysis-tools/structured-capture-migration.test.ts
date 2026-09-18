@@ -638,6 +638,69 @@ describe("migration CLI", () => {
     }
   });
 
+  it("never re-imports the generated monitoring events view as a source", async () => {
+    const sandbox = await createMigrationSandbox({ withConsultations: false });
+    const toolDir = new URL(".", import.meta.url).pathname;
+    const configPath = join(sandbox.root, "config.json");
+    const outputPath = join(sandbox.root, "feedback-change-sets.json");
+    const generatedPath = join(sandbox.coachingDocsDir, "monitoring", "events.md");
+    const concernPath = join(sandbox.coachingDocsDir, "monitoring", "hand-wrist.md");
+    const registryPath = join(sandbox.coachingDocsDir, "tracking", "concerns.yaml");
+    const config = {
+      active_profile: "default",
+      profiles: {
+        default: {
+          active_persona: "conservative",
+          coaching_docs_dir: sandbox.coachingDocsDir,
+          prescriptions_dir: sandbox.prescriptionsDir,
+        },
+      },
+      capture: {
+        model: "synthetic/capture-model",
+        timeout_seconds: 60,
+        max_candidates_per_turn: 3,
+      },
+    };
+
+    try {
+      await mkdir(dirname(generatedPath), { recursive: true });
+      await mkdir(dirname(registryPath), { recursive: true });
+      await writeFile(concernPath, MONITORING_BEFORE, "utf8");
+      // The materializer's own monitoring view: derived output that lives
+      // inside the directory source discovery scans.
+      await writeFile(
+        generatedPath,
+        `${GENERATED_MARKDOWN_HEADER}\n## 2026-05-01 — rendered-view-entry\n\nRENDERED_VIEW_BODY\n`,
+        "utf8",
+      );
+      await writeFile(
+        registryPath,
+        ["concerns:", "  - id: hand-wrist", "    active: true", "    log: monitoring/hand-wrist.md", ""].join("\n"),
+        "utf8",
+      );
+      await writeFile(configPath, JSON.stringify(config), "utf8");
+      await execFileAsync(
+        process.execPath,
+        [
+          "node_modules/tsx/dist/cli.mjs",
+          "migrate-structured-capture.ts",
+          "emit-change-set",
+          "--config",
+          configPath,
+          "--output",
+          outputPath,
+        ],
+        { cwd: toolDir },
+      );
+
+      // Re-importing the view would duplicate every monitoring entry on each
+      // migration run.
+      expect(await readFile(outputPath, "utf8")).not.toContain("RENDERED_VIEW_BODY");
+    } finally {
+      await sandbox.destroy();
+    }
+  });
+
   it("compare exits nonzero listing paths before regeneration and zero after it", async () => {
     const sandbox = await createMigrationSandbox({ withConsultations: false });
     const toolDir = new URL(".", import.meta.url).pathname;
@@ -705,6 +768,7 @@ import { makeRecord } from "./materialization-test-support.ts";
 import {
   migratedMonitoringSourceSessionId,
   planMonitoringImport,
+  planMonitoringEntries,
   readConcernRegistry,
 } from "../engram-coach-migration.ts";
 
@@ -712,6 +776,20 @@ const MONITORING_BEFORE = await readFile(join(FIXTURE_DIR, "monitoring-before.md
 const DOCTOR_PREP_BEFORE = await readFile(join(FIXTURE_DIR, "doctor-prep-before.md"), "utf8");
 const CONCERNS_REGISTRY = await readFile(join(FIXTURE_DIR, "concerns.yaml"), "utf8");
 
+
+const DECORATED_DATE_LOG = [
+  "## **2026-08-13** — Relapse three, med-timing decisions",
+  "",
+  "Bolded heading date; Date.parse accepts the emphasis verbatim.",
+  "",
+  "## Observations",
+  "",
+  "| date | signal | status | notes |",
+  "| --- | --- | --- | --- |",
+  "| 2026-08-02 (PM) | headache | present | afternoon onset |",
+  "| 2026-08-05 (post-ride) | headache | present | after the ride |",
+  "",
+].join("\n");
 describe("monitoring migration", () => {
   it("plans stable per-signal identities from concern ID, signal, relative path, and entry index", () => {
     const sets = planMonitoringImport({
@@ -775,6 +853,19 @@ describe("monitoring migration", () => {
       text: MONITORING_BEFORE,
     });
     expect(JSON.stringify(rerun)).toBe(JSON.stringify(sets));
+  });
+
+  it("normalizes decorated heading and cell dates to bare ISO dates", () => {
+    const entries = planMonitoringEntries("sinus", DECORATED_DATE_LOG);
+    // Emphasis and trailing qualifiers must never reach effectiveAt: they
+    // make the record undatable, and Date.parse accepts them while resolving
+    // them to a different instant than the bare ISO form.
+    for (const entry of entries) {
+      expect(entry.effectiveAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+    expect(entries.map((entry) => entry.effectiveAt)).toEqual(
+      expect.arrayContaining(["2026-08-13", "2026-08-02", "2026-08-05"]),
+    );
   });
 
   it("reads the concerns.yaml registry and hash-binds monitoring artifacts into the baseline plan", async () => {

@@ -364,6 +364,14 @@ function isRootRelativePath(value: string): boolean {
   return !value.split("/").some((segment) => segment === "" || segment === "." || segment === "..");
 }
 
+/**
+ * The aggregated monitoring events view. It is derived output that lives
+ * inside the monitoring directory the legacy importer scans for sources, so
+ * the importer must exclude it by name or a migration re-run imports its own
+ * output and duplicates every monitoring entry.
+ */
+export const MONITORING_EVENTS_VIEW_PATH = "monitoring/events.md";
+
 function defaultEventArtifact(entityType: EventEntityType): CaptureArtifactRef {
   switch (entityType) {
     case "consultation":
@@ -371,7 +379,7 @@ function defaultEventArtifact(entityType: EventEntityType): CaptureArtifactRef {
     case "workout-adaptation":
       return { kind: "adaptation", relativePath: "coaching/adaptations.md" };
     case "monitoring-event":
-      return { kind: "monitoring", relativePath: "monitoring/events.md" };
+      return { kind: "monitoring", relativePath: MONITORING_EVENTS_VIEW_PATH };
   }
 }
 
