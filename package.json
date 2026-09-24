@@ -1,6 +1,6 @@
 {
   "name": "@isparling/engram-coach",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "type": "module",
   "description": "Engram external pack for document-driven endurance coaching.",
