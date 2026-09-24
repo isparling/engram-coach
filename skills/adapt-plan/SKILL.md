@@ -72,10 +72,10 @@ Read and search silently before asking anything:
    | `power_curve_trend` | No | `get_power_curves` MCP |
    | `hr_at_power_trend` | No | MCP tools (compact endpoints) |
    | `resting_hr_trend` | No | `get_wellness_data` MCP |
-   | `hrv_trend` | No | `npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-analysis-tools/hrv-trend.ts --config {config_path} --date {target_date}` |
+   | `hrv_trend` | No | `npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-tools/hrv-trend.ts --config {config_path} --date {target_date}` |
 
    **`hrv_trend` — dedicated CLI tool:** When `hrv_trend` is enabled in the persona:
-   1. Run: `npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-analysis-tools/hrv-trend.ts --config {config_path} --date {today_YYYY-MM-DD}`. Pass persona-configured windows if present: `--short-window {short_window_days} --long-window {long_window_days} --metric {metric}`.
+   1. Run: `npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-tools/hrv-trend.ts --config {config_path} --date {today_YYYY-MM-DD}`. Pass persona-configured windows if present: `--short-window {short_window_days} --long-window {long_window_days} --metric {metric}`.
    2. Parse the JSON output. If `classification.label` is `amber-red` or `red`, surface it prominently in the Orient announcement with the full `reasoning` string.
    3. Store the complete output object as `hrv_trend_result` for use in Phase 3 — Synthesize and Phase 4 — Propose.
    4. If the tool exits non-zero or the output is malformed, annotate: "[hrv_trend unavailable — {error}. Proceeding without.]" and continue.
