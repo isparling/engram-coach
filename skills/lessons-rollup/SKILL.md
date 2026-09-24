@@ -51,7 +51,18 @@ This skill is called in two modes:
 
 ### Pre-Phase Setup _(no user input — run silently)_
 
-Follow **`${CLAUDE_PLUGIN_ROOT}/shared/setup.md`** — the shared configuration
+Resolve `{plugin_root}` before reading bundled assets:
+
+1. If `CLAUDE_PLUGIN_ROOT` is non-empty, use its absolute value.
+2. Otherwise (OMP), run `omp plugin list --json`, select the single enabled
+   `npm` entry whose `name` is exactly `@isparling/engram-coach`, and use its
+   absolute `path`.
+
+Verify `{plugin_root}/shared/setup.md` exists. If resolution or verification
+fails, stop and report the failure. Do not guess a package root by probing
+sibling repositories, dot-directories, or unrelated configuration variables.
+
+Then follow **`{plugin_root}/shared/setup.md`** — the shared configuration
 preamble (paths, config, profile, persona, athlete profile).
 
 **Optional steps this skill declares:** none — config, persona, and athlete profile only

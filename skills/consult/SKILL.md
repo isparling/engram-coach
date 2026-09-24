@@ -35,7 +35,18 @@ digraph adapt_plan {
 
 ### Pre-Phase Setup _(no user input — run silently)_
 
-Follow **`${CLAUDE_PLUGIN_ROOT}/shared/setup.md`** — the shared configuration
+Resolve `{plugin_root}` before reading bundled assets:
+
+1. If `CLAUDE_PLUGIN_ROOT` is non-empty, use its absolute value.
+2. Otherwise (OMP), run `omp plugin list --json`, select the single enabled
+   `npm` entry whose `name` is exactly `@isparling/engram-coach`, and use its
+   absolute `path`.
+
+Verify `{plugin_root}/shared/setup.md` exists. If resolution or verification
+fails, stop and report the failure. Do not guess a package root by probing
+sibling repositories, dot-directories, or unrelated configuration variables.
+
+Then follow **`{plugin_root}/shared/setup.md`** — the shared configuration
 preamble (paths, config, profile, persona, athlete profile).
 
 **Optional steps this skill declares:** PRESCRIPTIONS, SEASON, MCP, MONITORING
@@ -50,9 +61,9 @@ Read and search silently before asking anything:
 1. **Weekly consultation** - Read `{coaching_docs_dir}/{season}/{training-phase}/consultations.md` to gain context on recent concerns athlete has raised with coach over this training phase.
 2. **Historical adaptations** - Read `{coaching_docs_dir}/{season}/{training-phase}/{week}/.*-adaptation.md` records to understand historical adaptations and patterns tied to specific workouts.
 3. **Active prescription/plan** — List all YAML files in `prescriptions_dir`. For each file, find the maximum session_date. The active block is the file whose most recent session_date is on or before today. If ambiguous (multiple files with recent sessions), ask: "I found multiple prescription files with recent sessions: [list]. Which block are you currently in?" Read the full prescription file for the active block and the surrounding block context (week number, phase, upcoming sessions).
-4. **Training block context** — determine current phase (base/build/peak/recovery), position within the week, and upcoming workouts that may be affected by today's adaptation. After identifying the active block from step 1, resolve the block name to a template file name by stripping any date prefix and normalizing to lowercase with hyphens (e.g., "Build 1" → "build-1", "Base" → "base", "Race Specificity" → "race-specificity"). Then read `${CLAUDE_PLUGIN_ROOT}/templates/{block-name}.md` as additional context. This file describes the block's intent, session patterns, weekly structure, and success signals. If the file is missing: continue without it and annotate in the Orient summary: "[Block template {block-name}.md not found — proceeding without block template context.]"
+4. **Training block context** — determine current phase (base/build/peak/recovery), position within the week, and upcoming workouts that may be affected by today's adaptation. After identifying the active block from step 1, resolve the block name to a template file name by stripping any date prefix and normalizing to lowercase with hyphens (e.g., "Build 1" → "build-1", "Base" → "base", "Race Specificity" → "race-specificity"). Then read `{plugin_root}/templates/{block-name}.md` as additional context. This file describes the block's intent, session patterns, weekly structure, and success signals. If the file is missing: continue without it and annotate in the Orient summary: "[Block template {block-name}.md not found — proceeding without block template context.]"
 
-5. **Retrieval — find precedent.** Follow `${CLAUDE_PLUGIN_ROOT}/shared/retrieval.md`.
+5. **Retrieval — find precedent.** Follow `{plugin_root}/shared/retrieval.md`.
    Build 2-3 queries from *this session's specifics* — the session type, the numbers
    actually observed, and any anomaly worth explaining — never from this skill's name
    or topic. Cover both levels the policy describes: durable pattern, and session

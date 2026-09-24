@@ -33,7 +33,18 @@ digraph season_retrospective {
 
 ### Pre-Phase Setup _(no user input — run silently)_
 
-Follow **`${CLAUDE_PLUGIN_ROOT}/shared/setup.md`** — the shared configuration
+Resolve `{plugin_root}` before reading bundled assets:
+
+1. If `CLAUDE_PLUGIN_ROOT` is non-empty, use its absolute value.
+2. Otherwise (OMP), run `omp plugin list --json`, select the single enabled
+   `npm` entry whose `name` is exactly `@isparling/engram-coach`, and use its
+   absolute `path`.
+
+Verify `{plugin_root}/shared/setup.md` exists. If resolution or verification
+fails, stop and report the failure. Do not guess a package root by probing
+sibling repositories, dot-directories, or unrelated configuration variables.
+
+Then follow **`{plugin_root}/shared/setup.md`** — the shared configuration
 preamble (paths, config, profile, persona, athlete profile).
 
 **Optional steps this skill declares:** SEASON, MCP
@@ -66,7 +77,7 @@ Document reads and low-cost MCP calls only. No streams, no per-activity computat
    qmd query "{season} pivots"
    qmd query "{season} persona changes"
 
-Follow `${CLAUDE_PLUGIN_ROOT}/shared/retrieval.md` when constructing these — parameterize with the specifics below, and add queries for whatever this particular season actually raises.
+Follow `{plugin_root}/shared/retrieval.md` when constructing these — parameterize with the specifics below, and add queries for whatever this particular season actually raises.
    ```
    Surface major mid-season decisions (e.g., persona switched at week 12, planned A-race deferred).
 

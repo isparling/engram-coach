@@ -321,6 +321,11 @@ packages with `npm install` and add
 `./node_modules/@isparling/engram-omp/omp-extension.ts` to OMP's `extensions`
 list.
 
+Under OMP, coaching skills resolve bundled assets from the exact
+`@isparling/engram-coach` package `path` reported by `omp plugin list --json`.
+`CLAUDE_PLUGIN_ROOT` is a Claude Code runtime value; do not set it globally for
+OMP.
+
 The adapter does not read coaching plugin state and does not choose a pack:
 the active binding's `installed_packs` declaration does that. A complete Engram
 binding registry with the space already registered is an external

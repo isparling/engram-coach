@@ -33,7 +33,18 @@ digraph race_analysis {
 
 ### Pre-Phase Setup _(no user input — run silently)_
 
-Follow **`${CLAUDE_PLUGIN_ROOT}/shared/setup.md`** — the shared configuration
+Resolve `{plugin_root}` before reading bundled assets:
+
+1. If `CLAUDE_PLUGIN_ROOT` is non-empty, use its absolute value.
+2. Otherwise (OMP), run `omp plugin list --json`, select the single enabled
+   `npm` entry whose `name` is exactly `@isparling/engram-coach`, and use its
+   absolute `path`.
+
+Verify `{plugin_root}/shared/setup.md` exists. If resolution or verification
+fails, stop and report the failure. Do not guess a package root by probing
+sibling repositories, dot-directories, or unrelated configuration variables.
+
+Then follow **`{plugin_root}/shared/setup.md`** — the shared configuration
 preamble (paths, config, profile, persona, athlete profile).
 
 **Optional steps this skill declares:** SEASON, MCP
@@ -89,7 +100,7 @@ Run two CLIs and capture their JSON output. NO raw stream data enters LLM contex
 2. **Run stream-analyze:**
 
    ```bash
-   cd ${CLAUDE_PLUGIN_ROOT}/analysis-tools && npx tsx stream-analyze.ts \
+   cd {plugin_root}/analysis-tools && npx tsx stream-analyze.ts \
      --activity-id={race_id} \
      --analyses=fade,time_in_zone,np_distribution,decoupling,hr_recovery,interval_cv,sim_compare,lap_trends \
      --ftp-override={ftp} \
@@ -100,7 +111,7 @@ Run two CLIs and capture their JSON output. NO raw stream data enters LLM contex
 3. **Run race-context:**
 
    ```bash
-   cd ${CLAUDE_PLUGIN_ROOT}/analysis-tools && npx tsx race-context.ts --activity-id={race_id}
+   cd {plugin_root}/analysis-tools && npx tsx race-context.ts --activity-id={race_id}
    ```
 
 4. **Assemble bundle:** parse both JSON outputs. For any analysis present in `output.errors`, drop it from the bundle and note the error for the draft phase.

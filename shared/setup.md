@@ -14,13 +14,14 @@ Run silently. No user input except where step 6 applies.
 
 Resolve `{plugin_root}` before reading any bundled asset:
 
-1. Claude Code: use the absolute `${CLAUDE_PLUGIN_ROOT}` value.
-2. OMP: take the absolute path of this skill's loaded `SKILL.md` and remove
-   `/skills/{skill-name}/SKILL.md`.
+1. If `CLAUDE_PLUGIN_ROOT` is non-empty, use its absolute value.
+2. Otherwise (OMP), run `omp plugin list --json`, select the single enabled
+   `npm` entry whose `name` is exactly `@isparling/engram-coach`, and use its
+   absolute `path`.
 
 The result must contain `shared/setup.md`, `personas/`, `templates/`,
-`knowledge/`, `analyses/`, `analysis-tools/`, and `skills/`. Resolve every
-bundled path beneath this absolute root.
+`analyses/`, `analysis-tools/`, and `skills/`. Resolve every bundled path
+beneath this absolute root.
 
 ### Config path
 
