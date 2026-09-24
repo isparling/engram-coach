@@ -49,7 +49,7 @@ Read and search silently before asking anything:
 
 1. **Active prescription/plan** — List all YAML files in `prescriptions_dir`. For each file, find the maximum session_date. The active block is the file whose most recent session_date is on or before today. If ambiguous (multiple files with recent sessions), ask: "I found multiple prescription files with recent sessions: [list]. Which block are you currently in?" Read the full prescription file for the active block and the surrounding block context (week number, phase, upcoming sessions).
 
-2. **Execution data** — retrieve completed workout from Intervals.icu MCP tools. Note the prescription vs. actual delta: power targets met/missed, duration completed, interval count, HR behavior, any visible fade or drift. Retrieve HRV and wellness data via Intervals.icu MCP tools (get_wellness). If this call fails or returns no data, continue Phase 1 without HRV context and annotate in the Orient summary: "[HRV data unavailable — MCP wellness tool returned no data. Orient proceeds without HRV context.]"
+2. **Execution data** — retrieve completed workout from Intervals.icu MCP tools. Note the prescription vs. actual delta: power targets met/missed, duration completed, interval count, HR behavior, any visible fade or drift. Retrieve HRV and wellness data via Intervals.icu MCP tools (`get_wellness_data`). If this call fails or returns no data, continue Phase 1 without HRV context and annotate in the Orient summary: "[HRV data unavailable — MCP wellness tool returned no data. Orient proceeds without HRV context.]"
 
 2b. **Stream analysis** — read the active persona's `analyses` config from the loaded persona JSON. If the persona has no `analyses` field, skip this step entirely and proceed to step 3.
 
@@ -71,7 +71,7 @@ Read and search silently before asking anything:
    | `time_in_zones` | No | `get_power_histogram` + `get_hr_histogram` MCP |
    | `power_curve_trend` | No | `get_power_curves` MCP |
    | `hr_at_power_trend` | No | MCP tools (compact endpoints) |
-   | `resting_hr_trend` | No | `get_wellness` MCP |
+   | `resting_hr_trend` | No | `get_wellness_data` MCP |
    | `hrv_trend` | No | `npx tsx ${CLAUDE_PLUGIN_ROOT}/analysis-analysis-tools/hrv-trend.ts --config {config_path} --date {target_date}` |
 
    **`hrv_trend` — dedicated CLI tool:** When `hrv_trend` is enabled in the persona:

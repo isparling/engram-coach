@@ -41,11 +41,39 @@ analysis tools read them from the `intervals_icu` block of your
 
 ## 3. Intervals.icu MCP Server Setup
 
-The Intervals.icu MCP server exposes Intervals.icu API endpoints as MCP tools that skills call during execution. It must be configured in NanoClaw before skills can run.
+The Intervals.icu MCP server exposes Intervals.icu API endpoints as MCP tools that skills call during execution. It must be configured in the active agent host before skills can run.
 
 **What it does**
 
-Skills call MCP tools such as `get_wellness`, `get_athlete`, and `get_events` to retrieve training data. The MCP server handles authentication with Intervals.icu on each call.
+Skills call MCP tools such as `get_wellness_data`, `get_athlete_profile`, and `get_calendar_events` to retrieve training data. The MCP server handles authentication with Intervals.icu on each call.
+
+**How to configure it in OMP**
+
+Create `.omp/mcp.json` in the coaching workspace:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json",
+  "mcpServers": {
+    "intervals-icu": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/absolute/path/to/intervals-icu-mcp",
+        "intervals-icu-mcp",
+        "--scope",
+        "user"
+      ]
+    }
+  }
+}
+```
+
+The MCP server reads `INTERVALS_API_KEY` and `INTERVALS_ATHLETE_ID` from its
+existing environment or `.env`; do not copy credentials into the workspace
+config. Run `/mcp reload`, then `/mcp test intervals-icu`.
 
 **How to configure it in NanoClaw**
 
@@ -61,7 +89,9 @@ Refer to the [NanoClaw MCP configuration documentation](https://github.com/nanow
 
 **Verify**
 
-After configuring the MCP server, check NanoClaw's tool discovery to confirm the Intervals.icu tools appear in the available tool list.
+Confirm that the Intervals.icu server is connected and that
+`get_athlete_profile`, `get_fitness_summary`, and `get_wellness_data` appear in
+the available tool list. In OMP, use `/mcp list` and `/mcp test intervals-icu`.
 
 ---
 

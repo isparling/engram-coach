@@ -132,12 +132,12 @@ never stronger.
 
 ## 9. MCP availability check _(only if the skill declares MCP)_
 
-Attempt `get_athlete` via the Intervals.icu MCP tools. On a connection or
+Attempt `get_athlete_profile` via the Intervals.icu MCP tools. On a connection or
 availability error, stop and output:
 
 > "Intervals.icu MCP server is unavailable. This skill requires Intervals.icu
 > MCP tools to retrieve fitness data. See SETUP.md (Section 3: MCP Server
-> Setup), then restart Claude Code and retry."
+> Setup), then restart your agent session and retry."
 
 ## 10. Monitoring concerns _(only if the skill declares MONITORING)_
 
